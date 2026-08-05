@@ -599,7 +599,9 @@ app.add_middleware(
 )
 
 # Mount static directory for Physics Engine output
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 class SettingsModel(BaseModel):
     keys: dict
