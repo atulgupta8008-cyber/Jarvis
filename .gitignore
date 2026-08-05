@@ -1,0 +1,27 @@
+# Python bytecode and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local secrets and user data
+.env
+.env.*
+!*.env.example
+jarvis_system/settings.json
+jarvis_system/memory.json
+memory.json
+macros.json
+
+# Generated files and heavy models
+jarvis_system/static/simulations/
+jarvis_web/dist/
+vosk-model-small-en-us-0.15/
+*/vosk-model-small-en-us-0.15/
+*.log
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

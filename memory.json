@@ -1,0 +1,11 @@
+{
+    "user_profile": {
+        "Name": "Atul",
+        "Demographic": "17, Indian, speaks Hindi & English",
+        "Passions": "Physics, space exploration, Elon Musk, Tony Stark",
+        "Goal": "Reach MIT. Developing a relentless builder mindset."
+    },
+    "facts": [
+        "When playing audio files for the user Atul, if the path fails, verify the username (atulg vs Atul) and check for potential hidden whitespace or special characters in the filename before executing os.startfile."
+    ]
+}

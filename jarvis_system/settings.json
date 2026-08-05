@@ -1,0 +1,15 @@
+{
+    "keys": {
+        "groq": "",
+        "gemini": "",
+        "deepgram": "",
+        "sarvam": "",
+        "supabase_url": "",
+        "supabase_key": ""
+    },
+    "preferences": {
+        "active_brain": "gemini",
+        "active_ears": "vosk",
+        "active_voice": "edge-tts"
+    }
+}
