@@ -1,7 +1,12 @@
 import asyncio
 import json
 import os
-import pygame
+try:
+    import pygame
+    HAS_PYGAME = True
+except ImportError:
+    pygame = None
+    HAS_PYGAME = False
 import edge_tts
 import time
 import psutil
@@ -88,14 +93,15 @@ async def speak_text(text: str):
         audio_file = "response.mp3"
         await communicate.save(audio_file)
         
-        pygame.mixer.init()
-        pygame.mixer.music.load(audio_file)
-        pygame.mixer.music.play()
-        
-        while pygame.mixer.music.get_busy():
-            await asyncio.sleep(0.1)
+        if HAS_PYGAME and pygame:
+            pygame.mixer.init()
+            pygame.mixer.music.load(audio_file)
+            pygame.mixer.music.play()
             
-        pygame.mixer.quit()
+            while pygame.mixer.music.get_busy():
+                await asyncio.sleep(0.1)
+                
+            pygame.mixer.quit()
         if os.path.exists(audio_file):
             os.remove(audio_file)
     except Exception as e:
