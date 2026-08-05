@@ -2,11 +2,19 @@ import os
 import urllib.request
 import zipfile
 import json
-import pyaudio
 import speech_recognition as sr
 from deepgram import DeepgramClient
-from vosk import Model, KaldiRecognizer
 import config
+
+try:
+    import pyaudio
+except ImportError:
+    pyaudio = None
+
+try:
+    from vosk import Model, KaldiRecognizer, SetLogLevel
+except ImportError:
+    Model = KaldiRecognizer = SetLogLevel = None
 
 def ensure_vosk_model():
     """Checks if the lightweight Vosk model exists, downloads it if not."""
@@ -27,6 +35,9 @@ def ensure_vosk_model():
 
 def wait_for_wake_word() -> bool:
     """Listens in the background using Vosk until 'Jarvis' is spoken."""
+    if not pyaudio or not Model:
+        print("[Ears]: Offline wake-word detection (PyAudio/Vosk) is not available on this platform.")
+        return False
     model_path = ensure_vosk_model()
     
     # Hide Vosk's internal C++ logging from the terminal for a cleaner look

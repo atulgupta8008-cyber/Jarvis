@@ -1,14 +1,24 @@
 import datetime
 import psutil
 import os
-import pyautogui
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from AppOpener import open as open_app # Added for opening local apps
 
-# Set a safety pause so pyautogui doesn't go crazy and freeze your PC
-pyautogui.PAUSE = 0.5
+try:
+    import pyautogui
+    pyautogui.PAUSE = 0.5
+except ImportError:
+    pyautogui = None
+
+try:
+    from ctypes import cast, POINTER
+    from comtypes import CLSCTX_ALL
+    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+except ImportError:
+    AudioUtilities = IAudioEndpointVolume = CLSCTX_ALL = None
+
+try:
+    from AppOpener import open as open_app
+except ImportError:
+    open_app = None
 
 def get_system_time_date() -> str:
     """Returns the current local time and date."""

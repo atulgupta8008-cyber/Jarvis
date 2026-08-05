@@ -2,7 +2,10 @@ import pyperclip
 import requests
 import os
 import time
-import pyautogui
+try:
+    import pyautogui
+except ImportError:
+    pyautogui = None
 from datetime import datetime
 
 def extract_active_window_text() -> str:
