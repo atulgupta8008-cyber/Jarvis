@@ -37,23 +37,7 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
   const ws = useRef(null);
   const questionToAsk = initialQuestion || curiosityQuestion;
   const pendingQuestion = useRef(questionToAsk);
-
-  useEffect(() => {
-    if (questionToAsk) {
-      pendingQuestion.current = questionToAsk;
-      if (activeSessionId && ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ 
-          type: 'professor_query', 
-          text: questionToAsk, 
-          files: [], 
-          session_id: activeSessionId,
-          deep_research: false 
-        }));
-        setChatHistory(prev => [...prev, { role: 'user', message: questionToAsk }]);
-        pendingQuestion.current = null;
-      }
-    }
-  }, [initialQuestion, curiosityQuestion, activeSessionId]);
+  const hasDispatchedQuestion = useRef(false);
 
   useEffect(() => {
     ws.current = new WebSocket(WS_URL);
@@ -91,10 +75,20 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
           setSessionMedia([]);
           // Fetch media for this fresh session
           ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: data.session_id }));
-          if (pendingQuestion.current) {
-            ws.current.send(JSON.stringify({ type: 'professor_query', text: pendingQuestion.current, files: [], session_id: data.session_id }));
-            setChatHistory([{ role: 'user', message: pendingQuestion.current }]);
+          
+          // Send initial curiosity question EXACTLY ONCE
+          if (pendingQuestion.current && !hasDispatchedQuestion.current) {
+            hasDispatchedQuestion.current = true;
+            const q = pendingQuestion.current;
             pendingQuestion.current = null;
+            ws.current.send(JSON.stringify({ 
+              type: 'professor_query', 
+              text: q, 
+              files: [], 
+              session_id: data.session_id,
+              deep_research: false 
+            }));
+            setChatHistory([{ role: 'user', message: q }]);
           }
         } else if (data.type === 'blackboard_widget') {
           setBlackboardWidgets((widgets) => [...widgets, { id: data.id, type: data.widget_type, content: data.content, minimized: false }]);
