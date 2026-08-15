@@ -47,8 +47,8 @@ export default function SandboxMode({ onExit }) {
           setIsThinking(false);
         } else if (data.type === 'blackboard_widget') {
           setWidgets(prev => [...prev, {
-            id: `widget-${Date.now()}`,
-            type: data.board_type,
+            id: data.id || `widget-${Date.now()}`,
+            type: data.widget_type || data.board_type,
             content: data.content,
             minimized: false
           }]);

@@ -4,10 +4,10 @@ import asyncio
 from openai import AsyncOpenAI
 import config
 
-def cleanup_old_simulations(static_dir: str, max_age_seconds: int = 3600, max_files: int = 20):
+def cleanup_old_simulations(static_dir: str, max_age_seconds: int = 180, max_files: int = 2):
     """
     Deletes temporary python scripts immediately and prunes old simulation HTML files
-    that are older than max_age_seconds or exceed max_files count.
+    that are older than max_age_seconds (default 3 minutes) or exceed max_files count (default 2).
     """
     try:
         if not os.path.exists(static_dir):
@@ -21,30 +21,31 @@ def cleanup_old_simulations(static_dir: str, max_age_seconds: int = 3600, max_fi
             if not os.path.isfile(file_path):
                 continue
                 
-            # Immediately remove leftover python scripts
-            if item.startswith("script_") and item.endswith(".py"):
+            # Immediately remove leftover python scripts or temporary files
+            if (item.startswith("script_") and item.endswith(".py")) or item.endswith(".tmp"):
                 try:
                     os.remove(file_path)
                 except Exception:
                     pass
                 continue
                 
-            # Prune html files older than max_age_seconds
+            # Prune html simulation files
             if item.startswith("sim_") and item.endswith(".html"):
-                file_age = now - os.path.getmtime(file_path)
-                if file_age > max_age_seconds:
-                    try:
+                try:
+                    file_age = now - os.path.getmtime(file_path)
+                    if file_age > max_age_seconds:
                         os.remove(file_path)
-                    except Exception:
-                        pass
-                else:
-                    html_files.append((file_path, os.path.getmtime(file_path)))
+                    else:
+                        html_files.append((file_path, os.path.getmtime(file_path)))
+                except Exception:
+                    pass
                     
         # Prune if file count exceeds max_files (keep only newest)
         html_files.sort(key=lambda x: x[1], reverse=True)
         for old_file_path, _ in html_files[max_files:]:
             try:
-                os.remove(old_file_path)
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
             except Exception:
                 pass
     except Exception as e:

@@ -1,23 +1,17 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
+import NexusLanding from './NexusLanding';
 
-export default function NexusHubModal({ isActive, onLaunchMode }) {
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data && event.data.type === 'JARVIS_LAUNCH_MODE') {
-        const mode = event.data.mode;
-        onLaunchMode(mode);
-      }
-    };
+export default function NexusHubModal({ isActive, isOpen, onLaunchMode, curiosityHooks, onLaunchCuriosity, onOpenCuriosityDashboard }) {
+  const visible = isActive !== undefined ? isActive : (isOpen !== undefined ? isOpen : true);
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onLaunchMode]);
+  if (!visible) return null;
 
   return (
     <motion.div
-      initial={false}
-      animate={{ opacity: isActive ? 1 : 0, scale: isActive ? 1 : 0.98 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
       style={{
         position: 'fixed',
@@ -26,22 +20,15 @@ export default function NexusHubModal({ isActive, onLaunchMode }) {
         width: '100vw',
         height: '100vh',
         zIndex: 9999,
-        background: '#030712',
-        display: 'flex',
-        flexDirection: 'column',
-        pointerEvents: isActive ? 'auto' : 'none'
+        background: '#030508',
+        overflow: 'hidden'
       }}
     >
-      {/* Embedded Nexus Iframe */}
-      <iframe
-        src="/nexus/index.html"
-        title="JARVIS NEXUS HUB"
-        style={{
-          width: '100%',
-          flex: 1,
-          border: 'none',
-          outline: 'none'
-        }}
+      <NexusLanding 
+        onLaunchMode={onLaunchMode}
+        curiosityHooks={curiosityHooks}
+        onLaunchCuriosity={onLaunchCuriosity}
+        onOpenCuriosityDashboard={onOpenCuriosityDashboard}
       />
     </motion.div>
   );

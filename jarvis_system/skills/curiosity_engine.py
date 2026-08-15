@@ -45,15 +45,16 @@ No markdown, no explanation, just the JSON array."""
                 model="gemini-3.1-flash-lite",
                 contents=prompt
             )
-        response = await asyncio.to_thread(_generate)
+        response = await asyncio.wait_for(asyncio.to_thread(_generate), timeout=6.0)
         raw = response.text.strip()
         if raw.startswith('```'):
             raw = raw.split('\n', 1)[1].rsplit('```', 1)[0]
         hooks = json.loads(raw)
         if isinstance(hooks, list) and len(hooks) > 0:
             return hooks[:10]
-    except Exception as e:
-        print(f"[CuriosityEngine] AI generation failed: {e}")
+    except Exception:
+        # Graceful fallback to curated curiosity hooks
+        pass
 
     import random
     return random.sample(HARDCODED_HOOKS, min(10, len(HARDCODED_HOOKS)))

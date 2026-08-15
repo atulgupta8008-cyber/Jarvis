@@ -1,10 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, MessageSquare, Layout } from 'lucide-react';
+import { Menu, X, MessageSquare, Layout, Download } from 'lucide-react';
 import SocraticChatPanel from './SocraticChatPanel';
 import Blackboard from './Blackboard';
 import ProfessorSidebar from './ProfessorSidebar';
+import { exportKnowledgeCapsule } from '../utils/exportKnowledgeCapsule';
 import { WS_URL } from '../config';
+
+function addChildToNode(node, targetId, child) {
+  if (node.id === targetId) return { ...node, children: [...(node.children || []), child], loadingVariable: null };
+  return node.children?.length
+    ? { ...node, children: node.children.map((item) => addChildToNode(item, targetId, child)) }
+    : node;
+}
+
+function setNodeLoading(node, targetId, variable) {
+  if (node.id === targetId) return { ...node, loadingVariable: variable };
+  return node.children?.length
+    ? { ...node, children: node.children.map((item) => setNodeLoading(item, targetId, variable)) }
+    : node;
+}
 
 export default function ArchitectMode({ onExit }) {
   const [chatHistory, setChatHistory] = useState([]);
@@ -30,6 +45,8 @@ export default function ArchitectMode({ onExit }) {
       ws.current.send(JSON.stringify({ type: 'professor_fetch_sessions', mode: 'architect' }));
       // Mute the voice agent
       ws.current.send(JSON.stringify({ type: 'system_command', action: 'pause_voice_agent' }));
+      // Auto-create a brand new session for Architect Mode
+      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'architect' }));
     };
 
     ws.current.onmessage = (event) => {
@@ -38,17 +55,13 @@ export default function ArchitectMode({ onExit }) {
         
         // INTERCEPTOR LOGIC
         if (data.type === 'professor_chat') {
-          setChatHistory(prev => [...prev, { role: data.role, message: data.message }]);
+          setChatHistory(prev => [...prev, { role: data.role, message: data.message, teaching_score: data.teaching_score }]);
         } else if (data.type === 'professor_history_loaded') {
           if (data.history) {
             setChatHistory(data.history.map(msg => ({ role: msg.role === 'young_jarvis' ? 'young_jarvis' : 'user', message: msg.content })));
           }
         } else if (data.type === 'professor_sessions_loaded') {
           setSessions(data.sessions || []);
-          // If no active session, create one (or load the first if we wanted to)
-          // Actually, if we just booted up and don't have an active session, let's create a new one automatically
-          // Only if sessions is empty or we haven't picked one yet.
-          // We will wait for the first user action or explicitly click "New Session".
         } else if (data.type === 'professor_session_created') {
           setActiveSessionId(data.session_id);
           setChatHistory([]);
@@ -60,6 +73,12 @@ export default function ArchitectMode({ onExit }) {
             content: data.content,
             minimized: false
           }]);
+        } else if (data.type === 'fractal_expanded') {
+          setBlackboardWidgets((widgets) => widgets.map((widget) => {
+            if (widget.id !== data.parent_id) return widget;
+            const tree = widget.tree || { id: widget.id, equation: widget.content, children: [] };
+            return { ...widget, tree: addChildToNode(tree, data.node_id, { id: `${data.node_id}_${Date.now()}`, equation: data.equation, explanation: data.explanation, children: [] }) };
+          }));
         } else if (data.type === 'research_status') {
           setResearchStatus(data.status);
           if (data.status.includes('Complete')) {
@@ -82,16 +101,6 @@ export default function ArchitectMode({ onExit }) {
       }
     };
   }, []);
-
-  // Ensure there's always an active session
-  useEffect(() => {
-    if (!activeSessionId && sessions.length === 0 && ws.current?.readyState === WebSocket.OPEN) {
-      handleNewSession();
-    } else if (!activeSessionId && sessions.length > 0) {
-      // Auto-load the most recent session
-      handleSelectSession(sessions[0].id);
-    }
-  }, [sessions, activeSessionId]);
 
   const handleSendMessage = (payload) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN && activeSessionId) {
@@ -133,6 +142,26 @@ export default function ArchitectMode({ onExit }) {
     }
   };
 
+  const expandFractal = (widgetId, nodeId, targetVariable, context) => {
+    setBlackboardWidgets((widgets) => widgets.map((widget) => widget.id === widgetId
+      ? { ...widget, tree: setNodeLoading(widget.tree || { id: widget.id, equation: widget.content, children: [] }, nodeId, targetVariable) }
+      : widget));
+    ws.current?.readyState === WebSocket.OPEN && ws.current.send(JSON.stringify({ type: 'fractal_expand', context, target_variable: targetVariable, parent_id: widgetId, node_id: nodeId }));
+  };
+
+  const handleExportCapsule = () => {
+    const activeSession = sessions.find(s => s.id === activeSessionId);
+    const lastScoreMsg = [...chatHistory].reverse().find(m => m.teaching_score);
+    exportKnowledgeCapsule({
+      title: activeSession?.session_title || 'Architect Systems Thinking Session',
+      mode: 'architect',
+      chatHistory,
+      blackboardWidgets,
+      sessionMedia: [],
+      teachingScore: lastScoreMsg?.teaching_score || null
+    });
+  };
+
   return (
     <motion.div 
       className="forge-workspace architect-forge"
@@ -142,37 +171,67 @@ export default function ArchitectMode({ onExit }) {
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
       <header className="workspace-header">
-        <button 
-          className="workspace-icon-button"
-          onClick={() => setIsSessionsOpen(true)}
-        >
-          <Menu size={20} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            className="workspace-icon-button"
+            onClick={() => setIsSessionsOpen(true)}
+          >
+            <Menu size={20} />
+          </button>
 
-        <div className="workspace-brand">
-          ARCHITECT <span>Forge</span>
+          <div className="workspace-brand">
+            ARCHITECT <span>Forge</span>
+          </div>
         </div>
 
-        <div className="workspace-mobile-switch">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button 
-            className={mobilePane === 'chat' ? 'is-selected' : ''} 
-            onClick={() => setMobilePane('chat')}
+            className="workspace-action-pill"
+            onClick={handleExportCapsule}
+            title="Export Knowledge Capsule (Printable HTML / PDF Summary)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              background: 'rgba(255, 209, 101, 0.08)',
+              border: '1px solid rgba(255, 209, 101, 0.25)',
+              color: 'var(--amber, #ffd165)',
+              fontFamily: 'DM Mono, monospace',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
           >
-            <MessageSquare size={16} /> Chat
+            <Download size={14} />
+            <span>Export</span>
           </button>
-          <button 
-            className={mobilePane === 'board' ? 'is-selected' : ''} 
-            onClick={() => setMobilePane('board')}
-          >
-            <Layout size={16} /> Board
+
+          <button className="workspace-exit" onClick={onExit} title="Exit Session">
+            <X size={16} />
+            <span>Exit</span>
           </button>
         </div>
-
-        <button className="workspace-exit" onClick={onExit}>
-          <X size={16} />
-          <span>Exit</span>
-        </button>
       </header>
+
+      {/* Mobile Pane Switcher */}
+      <div className="workspace-mobile-switch">
+        <button 
+          type="button"
+          className={mobilePane === 'chat' ? 'is-selected' : ''} 
+          onClick={() => setMobilePane('chat')}
+        >
+          <MessageSquare size={15} /> Chat
+        </button>
+        <button 
+          type="button"
+          className={mobilePane === 'board' ? 'is-selected' : ''} 
+          onClick={() => setMobilePane('board')}
+        >
+          <Layout size={15} /> Board
+        </button>
+      </div>
 
       <main className="workspace-grid">
         {/* Chat Pane */}
@@ -214,7 +273,7 @@ export default function ArchitectMode({ onExit }) {
 
         {/* Board Pane */}
         <div className={`workspace-board ${mobilePane === 'board' ? 'is-mobile-active' : ''}`}>
-          <Blackboard widgets={blackboardWidgets} setWidgets={setBlackboardWidgets} />
+          <Blackboard widgets={blackboardWidgets} setWidgets={setBlackboardWidgets} onFractalExpand={expandFractal} />
         </div>
       </main>
 

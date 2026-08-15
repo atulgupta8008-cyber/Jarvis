@@ -40,13 +40,20 @@ async def handle_architect_query(session_id: str, text: str, files_data: list, d
                 f.write(file_bytes)
             local_file_paths.append(local_path)
             
-            # Upload to Gemini asynchronously
-            def _upload():
-                print(f"Uploading {file_name} to Gemini...")
-                return client.files.upload(file=local_path)
-                
-            gemini_file = await asyncio.to_thread(_upload)
-            uploaded_files.append(gemini_file)
+            mime_type = file_obj.get("mime", "application/pdf" if file_name.endswith(".pdf") else "application/octet-stream")
+            if not mime_type or mime_type == "application/octet-stream":
+                if file_name.endswith(".pdf"): mime_type = "application/pdf"
+                elif file_name.endswith(".png"): mime_type = "image/png"
+                elif file_name.endswith(".jpg") or file_name.endswith(".jpeg"): mime_type = "image/jpeg"
+                elif file_name.endswith(".txt") or file_name.endswith(".md") or file_name.endswith(".py"): mime_type = "text/plain"
+
+            if len(file_bytes) <= 20 * 1024 * 1024:
+                uploaded_files.append(genai.types.Part.from_bytes(data=file_bytes, mime_type=mime_type))
+            else:
+                def _upload():
+                    return client.files.upload(file=local_path)
+                gemini_file = await asyncio.to_thread(_upload)
+                uploaded_files.append(genai.types.Part.from_uri(file_uri=gemini_file.uri, mime_type=gemini_file.mime_type or mime_type))
 
     # 2. Memory Orchestration
     # A. Load History
@@ -127,10 +134,11 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
             last_role = current_role
 
     # Build final turn parts
-    final_parts = []
-    for g_file in uploaded_files:
-        final_parts.append(g_file)
-    final_parts.append(text if text.strip() else "[File Attached]")
+    final_parts = list(uploaded_files)
+    if text.strip():
+        final_parts.append(genai.types.Part.from_text(text=text))
+    else:
+        final_parts.append(genai.types.Part.from_text(text="[File Attached]"))
 
     if last_role == "user":
         # We can't append a user message if the last one was user. Merge text parts.
@@ -138,13 +146,17 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
     else:
         messages.append({"role": "user", "parts": final_parts})
 
-    formatted_contents = [
-        genai.types.Content(
-            role=m["role"],
-            parts=[genai.types.Part.from_text(text=p) if isinstance(p, str) else p for p in m["parts"]]
-        )
-        for m in messages
-    ]
+    formatted_contents = []
+    for m in messages:
+        content_parts = []
+        for p in m["parts"]:
+            if isinstance(p, str):
+                content_parts.append(genai.types.Part.from_text(text=p))
+            elif isinstance(p, genai.types.Part):
+                content_parts.append(p)
+            else:
+                content_parts.append(genai.types.Part.from_text(text=str(p)))
+        formatted_contents.append(genai.types.Content(role=m["role"], parts=content_parts))
     loop = asyncio.get_running_loop()
     def _generate():
         if send_ui_update:

@@ -67,7 +67,6 @@ class ConnectionManager:
         if len(self.active_connections) == 0:
             global VOICE_AGENT_MUTED
             VOICE_AGENT_MUTED = True
-            print("[System] Voice Agent Auto-Muted (No active UI connections)")
 
     async def broadcast(self, message: dict):
         for connection in self.active_connections:
@@ -80,7 +79,7 @@ manager = ConnectionManager()
 # Global queue for handling inputs from any source
 input_queue = asyncio.Queue()
 
-# Global flag to mute the voice agent when Professor Mode is active
+# Global flag to mute the voice agent on the main learning platform
 VOICE_AGENT_MUTED = True
 
 async def speak_text(text: str):
@@ -127,45 +126,25 @@ async def telemetry_loop():
         await asyncio.sleep(1) # 1 second updates
 
 async def audio_listener_loop():
-    """Runs the blocking audio listening functions in an executor."""
-    loop = asyncio.get_running_loop()
+    """Background listener disabled for main learning platform (Voice Assistant runs in standalone project)."""
     while True:
-        if VOICE_AGENT_MUTED:
-            await asyncio.sleep(1)
-            continue
-            
-        # Wait for wake word (Blocking call in executor)
-        woke_up = await loop.run_in_executor(None, wait_for_wake_word)
-        if woke_up and not VOICE_AGENT_MUTED:
-            # Alert the UI
-            await manager.broadcast({
-                "type": "state", 
-                "state": "listening", 
-                "main_text": "Listening...", 
-                "sub_text": "Speak your command"
-            })
-            
-            # Listen and transcribe (Blocking call in executor)
-            user_text = await loop.run_in_executor(None, listen_and_transcribe)
-            if user_text:
-                await input_queue.put({"type": "voice", "text": user_text})
-            else:
-                await manager.broadcast({
-                    "type": "state", 
-                    "state": "sleeping", 
-                    "main_text": "System Standby", 
-                    "sub_text": "Say 'Jarvis' or type a command"
-                })
+        await asyncio.sleep(3600)
 
 async def cleanup_loop():
     """Periodically cleans up old simulation files to prevent disk space exhaustion."""
     static_dir = os.path.join(os.path.dirname(__file__), "static", "simulations")
+    # Immediate cleanup on startup
+    try:
+        physics_ops.cleanup_old_simulations(static_dir, max_age_seconds=180, max_files=2)
+    except Exception as e:
+        print(f"Initial cleanup error: {e}")
+        
     while True:
         try:
-            physics_ops.cleanup_old_simulations(static_dir, max_age_seconds=3600, max_files=20)
+            physics_ops.cleanup_old_simulations(static_dir, max_age_seconds=180, max_files=2)
         except Exception as e:
             print(f"Cleanup error: {e}")
-        await asyncio.sleep(60)
+        await asyncio.sleep(20)
 
 async def jarvis_processing_loop():
     """Main processing loop that handles inputs from the queue."""
@@ -184,10 +163,8 @@ async def jarvis_processing_loop():
             action = command.get("action")
             if action == "pause_voice_agent":
                 VOICE_AGENT_MUTED = True
-                print("[System] Voice Agent Muted")
             elif action == "resume_voice_agent":
                 VOICE_AGENT_MUTED = False
-                print("[System] Voice Agent Resumed")
             continue
         
         # --- PHASE 3 & 4: THE COGNITIVE ROUTER & SESSION MANAGEMENT ---
@@ -246,8 +223,50 @@ async def jarvis_processing_loop():
             try:
                 history = await professor_ops.cloud_engine.load_professor_session(session_id)
                 await manager.broadcast({"type": "professor_history_loaded", "history": history})
+                media_list = await professor_ops.cloud_engine.fetch_session_media(session_id)
+                await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
             except Exception:
                 pass
+            continue
+
+        if input_type == "professor_fetch_media":
+            session_id = command.get("session_id")
+            if session_id:
+                try:
+                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id)
+                    await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
+                except Exception as e:
+                    print(f"Error fetching media for {session_id}: {e}")
+            continue
+
+        if input_type == "professor_delete_media":
+            session_id = command.get("session_id")
+            media_id = command.get("media_id")
+            if session_id and media_id:
+                try:
+                    await professor_ops.cloud_engine.delete_session_media(session_id, media_id)
+                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id)
+                    await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
+                except Exception as e:
+                    print(f"Error deleting media {media_id}: {e}")
+            continue
+
+        if input_type == "professor_upload_media":
+            session_id = command.get("session_id")
+            file_obj = command.get("file", {})
+            if session_id and file_obj:
+                try:
+                    await professor_ops.cloud_engine.save_session_media(
+                        session_id=session_id,
+                        name=file_obj.get("name", "document.pdf"),
+                        mime=file_obj.get("mime", "application/pdf"),
+                        size=file_obj.get("size", 0),
+                        base64_data=file_obj.get("data", "")
+                    )
+                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id)
+                    await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
+                except Exception as e:
+                    print(f"Error uploading media for {session_id}: {e}")
             continue
 
         if input_type == "professor_query":
@@ -662,18 +681,25 @@ async def websocket_endpoint(websocket: WebSocket):
                         "parent_id": msg.get("parent_id", ""),
                         "node_id": msg.get("node_id", "")
                     })
-                elif msg.get("type") in ["professor_load_history", "professor_fetch_sessions", "professor_create_session", "professor_delete_session"]:
+                elif msg.get("type") in ["professor_load_history", "professor_fetch_sessions", "professor_create_session", "professor_delete_session", "professor_fetch_media", "professor_delete_media", "professor_upload_media"]:
                     await input_queue.put({
                         "type": msg.get("type"),
                         "session_id": msg.get("session_id"),
-                        "mode": msg.get("mode", "professor")
+                        "mode": msg.get("mode", "professor"),
+                        "media_id": msg.get("media_id"),
+                        "file": msg.get("file")
                     })
                 elif msg.get("type") == "curiosity_feed_request":
                     hooks = await curiosity_engine.generate_curiosity_feed()
-                    await websocket.send_json({"type": "curiosity_feed_response", "hooks": hooks})
+                    try:
+                        await websocket.send_json({"type": "curiosity_feed_response", "hooks": hooks})
+                    except Exception:
+                        pass
             except json.JSONDecodeError:
                 pass
-    except WebSocketDisconnect:
+            except Exception:
+                pass
+    except (WebSocketDisconnect, RuntimeError, Exception):
         manager.disconnect(websocket)
 
 if __name__ == "__main__":

@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, Menu, X, MessageSquare, Layout } from 'lucide-react';
+import { LogOut, Menu, X, MessageSquare, Layout, FolderLock, Download } from 'lucide-react';
 import SocraticChatPanel from './SocraticChatPanel';
 import Blackboard from './Blackboard';
 import ProfessorSidebar from './ProfessorSidebar';
+import SessionMediaModal from './SessionMediaModal';
+import { exportKnowledgeCapsule } from '../utils/exportKnowledgeCapsule';
 import { WS_URL } from '../config';
 
 function addChildToNode(node, targetId, child) {
@@ -25,6 +27,8 @@ export default function ProfessorMode({ onExit, curiosityQuestion }) {
   const [blackboardWidgets, setBlackboardWidgets] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sessionMedia, setSessionMedia] = useState([]);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [mobilePane, setMobilePane] = useState('chat');
   const [researchStatus, setResearchStatus] = useState('');
@@ -60,10 +64,15 @@ export default function ProfessorMode({ onExit, curiosityQuestion }) {
           setChatHistory(data.history.map((item) => ({ role: item.role === 'jarvis' ? 'jarvis' : 'user', message: item.content })));
         } else if (data.type === 'professor_sessions_loaded') {
           setSessions(data.sessions || []);
+        } else if (data.type === 'professor_media_loaded') {
+          setSessionMedia(data.media || []);
         } else if (data.type === 'professor_session_created') {
           setActiveSessionId(data.session_id);
           setChatHistory([]);
           setBlackboardWidgets([]);
+          setSessionMedia([]);
+          // Fetch media for this fresh session
+          ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: data.session_id }));
           if (pendingQuestion.current) {
             ws.current.send(JSON.stringify({ type: 'professor_query', text: pendingQuestion.current, files: [], session_id: data.session_id }));
             setChatHistory([{ role: 'user', message: pendingQuestion.current }]);
@@ -103,15 +112,51 @@ export default function ProfessorMode({ onExit, curiosityQuestion }) {
       ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'professor' }));
     }
   };
+
   const selectSession = (id) => {
     setActiveSessionId(id);
     setBlackboardWidgets([]);
+    setSessionMedia([]);
     setIsSessionsOpen(false);
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ type: 'professor_load_history', session_id: id, mode: 'professor' }));
+      ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: id }));
     }
   };
+
   const deleteSession = (id) => ws.current?.readyState === WebSocket.OPEN && ws.current.send(JSON.stringify({ type: 'professor_delete_session', session_id: id, mode: 'professor' }));
+  
+  const handleUploadMedia = (fileObj) => {
+    if (ws.current?.readyState === WebSocket.OPEN && activeSessionId) {
+      ws.current.send(JSON.stringify({
+        type: 'professor_upload_media',
+        session_id: activeSessionId,
+        file: fileObj
+      }));
+    }
+  };
+
+  const handleDeleteMedia = (sessionId, mediaId) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({
+        type: 'professor_delete_media',
+        session_id: sessionId,
+        media_id: mediaId
+      }));
+    }
+  };
+
+  const handleExportCapsule = () => {
+    const activeSession = sessions.find(s => s.id === activeSessionId);
+    exportKnowledgeCapsule({
+      title: activeSession?.session_title || 'Socratic Derivation Session',
+      mode: 'professor',
+      chatHistory,
+      blackboardWidgets,
+      sessionMedia
+    });
+  };
+
   const expandFractal = (widgetId, nodeId, targetVariable, context) => {
     setBlackboardWidgets((widgets) => widgets.map((widget) => widget.id === widgetId
       ? { ...widget, tree: setNodeLoading(widget.tree || { id: widget.id, equation: widget.content, children: [] }, nodeId, targetVariable) }
@@ -148,34 +193,101 @@ export default function ProfessorMode({ onExit, curiosityQuestion }) {
         />
       </div>
 
+      {/* Header */}
       <div className="workspace-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button className="workspace-icon-button" onClick={() => setIsSessionsOpen(true)}>
+          <button className="workspace-icon-button" onClick={() => setIsSessionsOpen(true)} title="Open Sessions Sidebar">
             <Menu size={20} />
           </button>
           <div className="workspace-brand">JARVIS <span style={{ opacity: 0.5, fontWeight: 400 }}>// PROFESSOR</span></div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="workspace-mobile-switch">
-            <button 
-              className={mobilePane === 'chat' ? 'is-selected' : ''} 
-              onClick={() => setMobilePane('chat')}
-            >
-              <MessageSquare size={16} /> Chat
-            </button>
-            <button 
-              className={mobilePane === 'board' ? 'is-selected' : ''} 
-              onClick={() => setMobilePane('board')}
-            >
-              <Layout size={16} /> Board
-            </button>
-          </div>
-          <button className="workspace-exit" onClick={onExit}>
-            <LogOut size={16} /> Exit
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Media Vault Action */}
+          <button 
+            className="workspace-action-pill"
+            onClick={() => setIsMediaModalOpen(true)}
+            title="Open Session Media Vault (PDFs & Documents)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              background: 'rgba(110, 246, 247, 0.08)',
+              border: '1px solid rgba(110, 246, 247, 0.25)',
+              color: 'var(--cyan, #6ef6f7)',
+              fontFamily: 'DM Mono, monospace',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <FolderLock size={14} />
+            <span>Vault</span>
+            {sessionMedia.length > 0 && (
+              <span style={{
+                background: 'var(--cyan, #6ef6f7)',
+                color: '#030508',
+                borderRadius: '10px',
+                padding: '0 6px',
+                fontWeight: '700',
+                fontSize: '10px'
+              }}>
+                {sessionMedia.length}
+              </span>
+            )}
+          </button>
+
+          {/* Export Capsule Action */}
+          <button 
+            className="workspace-action-pill"
+            onClick={handleExportCapsule}
+            title="Export Knowledge Capsule (Printable HTML / PDF Summary)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              background: 'rgba(169, 150, 255, 0.08)',
+              border: '1px solid rgba(169, 150, 255, 0.25)',
+              color: 'var(--violet, #a996ff)',
+              fontFamily: 'DM Mono, monospace',
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Download size={14} />
+            <span>Export</span>
+          </button>
+
+          <button className="workspace-exit" onClick={onExit} title="Exit Session">
+            <LogOut size={15} /> <span>Exit</span>
           </button>
         </div>
       </div>
 
+      {/* Mobile Pane Switcher */}
+      <div className="workspace-mobile-switch">
+        <button 
+          type="button"
+          className={mobilePane === 'chat' ? 'is-selected' : ''} 
+          onClick={() => setMobilePane('chat')}
+        >
+          <MessageSquare size={15} /> Chat
+        </button>
+        <button 
+          type="button"
+          className={mobilePane === 'board' ? 'is-selected' : ''} 
+          onClick={() => setMobilePane('board')}
+        >
+          <Layout size={15} /> Board
+        </button>
+      </div>
+
+      {/* Grid */}
       <div className="workspace-grid">
         <div className={`workspace-chat ${mobilePane === 'chat' ? 'is-mobile-active' : ''}`}>
           <div className="workspace-pane-label">Socratic Interface</div>
@@ -184,6 +296,9 @@ export default function ProfessorMode({ onExit, curiosityQuestion }) {
             onSendMessage={send} 
             isThinking={isThinking} 
             currentAct={currentAct} 
+            onOpenMediaVault={() => setIsMediaModalOpen(true)}
+            onUploadMedia={handleUploadMedia}
+            mediaCount={sessionMedia.length}
           />
           {researchStatus && (
             <div className="workspace-research-status">
@@ -201,6 +316,16 @@ export default function ProfessorMode({ onExit, curiosityQuestion }) {
           />
         </div>
       </div>
+
+      {/* Session Media Vault Modal */}
+      <SessionMediaModal
+        isOpen={isMediaModalOpen}
+        onClose={() => setIsMediaModalOpen(false)}
+        sessionId={activeSessionId}
+        media={sessionMedia}
+        onUploadMedia={handleUploadMedia}
+        onDeleteMedia={handleDeleteMedia}
+      />
     </div>
   );
 }

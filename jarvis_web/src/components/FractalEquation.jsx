@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function FractalEquation({ node, onVariableClick }) {
   const containerRef = useRef(null);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const hasChildren = node.children && node.children.length > 0;
 
   // Helper to extract clickable variable symbols from LaTeX

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import TeachingScoreCard from './TeachingScoreCard';
 
 const ChatPanel = ({ history, theme = 'default' }) => {
   const scrollRef = useRef(null);
@@ -139,6 +140,7 @@ const ChatPanel = ({ history, theme = 'default' }) => {
                 <div style={{ color: isUser ? '#fff' : '#f8fafc', whiteSpace: 'pre-wrap' }}>
                   {msg.message}
                 </div>
+                {msg.teaching_score && <TeachingScoreCard score={msg.teaching_score} />}
               </div>
             </motion.div>
           );

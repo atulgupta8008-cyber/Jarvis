@@ -71,31 +71,53 @@ async def handle_professor_query(session_id: str, text: str, files_data: list, d
     uploaded_files = []
     local_file_paths = []
     
-    # 1. Decode and Upload files using asyncio.to_thread to prevent blocking
+    # 1. Decode, Save to Session Media Vault (Supabase + Local), and Upload to Gemini
     if files_data:
         for i, file_obj in enumerate(files_data):
-            # Decode Base64
             file_name = file_obj.get("name", f"upload_{int(time.time())}_{i}.dat")
+            mime_type = file_obj.get("mime", "application/pdf" if file_name.endswith(".pdf") else "application/octet-stream")
             b64_string = file_obj.get("data", "")
             
-            # Remove data URI prefix if present
-            if "," in b64_string:
-                b64_string = b64_string.split(",")[1]
-                
-            file_bytes = base64.b64decode(b64_string)
-            local_path = os.path.join(temp_dir, file_name)
-            
-            with open(local_path, "wb") as f:
-                f.write(file_bytes)
-            local_file_paths.append(local_path)
-            
-            # Upload to Gemini asynchronously
-            def _upload():
-                print(f"Uploading {file_name} to Gemini...")
-                return client.files.upload(file=local_path)
-                
-            gemini_file = await asyncio.to_thread(_upload)
-            uploaded_files.append(gemini_file)
+            # Save into isolated session media vault (Supabase + Cache)
+            await cloud_engine.save_session_media(
+                session_id=session_id,
+                name=file_name,
+                mime=mime_type,
+                size=file_obj.get("size", 0),
+                base64_data=b64_string
+            )
+
+    # 1.5 Fetch ALL media belonging to this specific session and prepare Gemini Parts
+    session_media_items = await cloud_engine.fetch_session_media(session_id)
+    media_filenames = [m["name"] for m in session_media_items]
+
+    file_parts = []
+    for m in session_media_items:
+        f_path = m.get("local_path")
+        if f_path and os.path.exists(f_path):
+            try:
+                mime_type = m.get("mime_type") or ("application/pdf" if f_path.endswith(".pdf") else "application/octet-stream")
+                if not mime_type or mime_type == "application/octet-stream":
+                    if f_path.endswith(".pdf"): mime_type = "application/pdf"
+                    elif f_path.endswith(".png"): mime_type = "image/png"
+                    elif f_path.endswith(".jpg") or f_path.endswith(".jpeg"): mime_type = "image/jpeg"
+                    elif f_path.endswith(".txt") or f_path.endswith(".md") or f_path.endswith(".py") or f_path.endswith(".json"): mime_type = "text/plain"
+
+                file_size = os.path.getsize(f_path)
+                if file_size <= 20 * 1024 * 1024:  # <= 20MB: direct fast inline bytes
+                    with open(f_path, "rb") as f:
+                        f_bytes = f.read()
+                    part = genai.types.Part.from_bytes(data=f_bytes, mime_type=mime_type)
+                    file_parts.append(part)
+                    print(f"[Professor] Attached session document: {m['name']} ({len(f_bytes)} bytes)")
+                else:  # > 20MB: upload via Files API and pass from_uri
+                    def _upload():
+                        return client.files.upload(file=f_path)
+                    g_file = await asyncio.to_thread(_upload)
+                    part = genai.types.Part.from_uri(file_uri=g_file.uri, mime_type=g_file.mime_type or mime_type)
+                    file_parts.append(part)
+            except Exception as e:
+                print(f"[Professor] Notice preparing file {m['name']} for Gemini: {e}")
 
     # 2. Memory Orchestration
     # A. Load History
@@ -131,6 +153,9 @@ async def handle_professor_query(session_id: str, text: str, files_data: list, d
 
         system_guardrails += "\n\nSTRICT OUTPUT CONSTRAINT:\n1. Use the <math_board>...</math_board> tag exclusively for long, multi-step calculus or derivations written in standard LaTeX.\n2. Use the <diagram_board>...</diagram_board> tag exclusively for free-body diagrams, system architectures, or flowcharts written in Mermaid.js syntax.\n3. Use the <simulation_board>...</simulation_board> tag exclusively to prompt the physics engine to generate a 3D visualization using Plotly/Three.js.\n\nThink deeply. Provide exhaustive, step-by-step derivations on the blackboard. Use simulations liberally to demonstrate complex systems. Never use these tags for normal conversation."
 
+        if media_filenames:
+            system_guardrails += f"\n\n[SESSION MEDIA VAULT: The student has uploaded the following course materials/PDFs for this session: {', '.join(media_filenames)}. Use these specific documents to guide your Socratic explanations, problems, and derivations whenever relevant.]"
+
         messages.append({"role": "user", "parts": [system_guardrails]})
         messages.append({"role": "model", "parts": ["Understood. I will adhere to the Socratic guardrails, Epiphany Mode rules, Collider Mode rules (if engaged), and strict output formatting."]})
 
@@ -154,10 +179,11 @@ async def handle_professor_query(session_id: str, text: str, files_data: list, d
                 last_role = current_role
 
         # Build final turn parts
-        final_parts = []
-        for g_file in uploaded_files:
-            final_parts.append(g_file)
-        final_parts.append(text if text.strip() else "[File Attached]")
+        final_parts = list(file_parts)
+        if text.strip():
+            final_parts.append(genai.types.Part.from_text(text=text))
+        else:
+            final_parts.append(genai.types.Part.from_text(text="[Course Materials Attached]"))
 
         if last_role == "user":
             # We can't append a user message if the last one was user. Merge text parts.
@@ -166,36 +192,45 @@ async def handle_professor_query(session_id: str, text: str, files_data: list, d
             messages.append({"role": "user", "parts": final_parts})
 
         # 3. Call Gemini
-        formatted_contents = [
-            genai.types.Content(
-                role=m["role"],
-                parts=[genai.types.Part.from_text(text=p) if isinstance(p, str) else p for p in m["parts"]]
-            )
-            for m in messages
-        ]
+        formatted_contents = []
+        for m in messages:
+            content_parts = []
+            for p in m["parts"]:
+                if isinstance(p, str):
+                    content_parts.append(genai.types.Part.from_text(text=p))
+                elif isinstance(p, genai.types.Part):
+                    content_parts.append(p)
+                else:
+                    content_parts.append(genai.types.Part.from_text(text=str(p)))
+            formatted_contents.append(genai.types.Content(role=m["role"], parts=content_parts))
+
         loop = asyncio.get_running_loop()
         def _generate():
-            if send_ui_update and not deep_research:
-                response = client.models.generate_content_stream(
-                    model="gemini-3.1-flash-lite",
-                    contents=formatted_contents,
-                    config=genai.types.GenerateContentConfig(max_output_tokens=8192)
-                )
-                full_text = ""
-                for chunk in response:
-                    full_text += chunk.text
-                    asyncio.run_coroutine_threadsafe(
-                        send_ui_update({"status": "stream_chunk", "chunk": chunk.text}),
-                        loop
+            try:
+                if send_ui_update and not deep_research:
+                    response = client.models.generate_content_stream(
+                        model="gemini-3.1-flash-lite",
+                        contents=formatted_contents,
+                        config=genai.types.GenerateContentConfig(max_output_tokens=8192)
                     )
-                return full_text
-            else:
-                response = client.models.generate_content(
-                    model="gemini-3.1-flash-lite",
-                    contents=formatted_contents,
-                    config=genai.types.GenerateContentConfig(max_output_tokens=8192)
-                )
-                return response.text
+                    full_text = ""
+                    for chunk in response:
+                        full_text += chunk.text
+                        asyncio.run_coroutine_threadsafe(
+                            send_ui_update({"status": "stream_chunk", "chunk": chunk.text}),
+                            loop
+                        )
+                    return full_text
+                else:
+                    response = client.models.generate_content(
+                        model="gemini-3.1-flash-lite",
+                        contents=formatted_contents,
+                        config=genai.types.GenerateContentConfig(max_output_tokens=8192)
+                    )
+                    return response.text
+            except Exception as ex:
+                print(f"[Professor Engine Error]: {ex}")
+                return f"I encountered an issue processing the course documents. Let's analyze the fundamental concepts directly: {ex}"
 
         response_text = await asyncio.to_thread(_generate)
 
@@ -284,14 +319,24 @@ RULE 3 (No Chat): Do NOT output conversational text. Output ONLY the JSON payloa
 RULE 4 (JSON Escaping): You MUST double-escape all LaTeX backslashes in your JSON output so it parses correctly. For example, write "\\\\frac{{1}}{{2}}" instead of "\\frac{{1}}{{2}}", and "\\\\int" instead of "\\int".
 """
 
-    model = genai.GenerativeModel("gemini-3.1-flash-lite", generation_config={"response_mime_type": "application/json"})
-    
     try:
         def _generate():
-            return model.generate_content(prompt)
+            return client.models.generate_content(
+                model="gemini-3.1-flash-lite",
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    max_output_tokens=2048
+                )
+            )
             
         response = await asyncio.to_thread(_generate)
-        data = json.loads(response.text.strip())
+        raw_text = response.text.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\n?", "", raw_text)
+            raw_text = re.sub(r"\n?```$", "", raw_text).strip()
+            
+        data = json.loads(raw_text)
         return {
             "equation": data.get("equation", f"{target_variable} = \\text{{fundamental constant}}"),
             "explanation": data.get("explanation", f"{target_variable} is a fundamental quantity in this context.")

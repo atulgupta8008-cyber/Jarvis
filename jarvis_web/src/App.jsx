@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Activity, Cpu, MemoryStick, Battery, Layers } from 'lucide-react';
+import { Settings, Layers, Send, Activity, Radio, Cpu, Sparkles, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import InfinityCore from './components/InfinityCore';
 import ChatPanel from './components/ChatPanel';
@@ -15,39 +15,24 @@ import CuriosityOrb from './components/CuriosityOrb';
 import CuriosityDashboard from './components/CuriosityDashboard';
 import { WS_URL } from './config';
 
-const RadialProgress = ({ value, icon: Icon, label, color }) => {
-  const radius = 22;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (value / 100) * circumference;
-  
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '16px', border: '1px solid var(--glass-border)', backdropFilter: 'blur(10px)' }}>
-      <div style={{ position: 'relative', width: '50px', height: '50px' }}>
-        <svg width="50" height="50" style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx="25" cy="25" r={radius} stroke="rgba(255,255,255,0.05)" strokeWidth="4" fill="transparent" />
-          <motion.circle 
-            cx="25" cy="25" r={radius} 
-            stroke={color} strokeWidth="4" fill="transparent"
-            strokeDasharray={circumference}
-            animate={{ strokeDashoffset }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            strokeLinecap="round"
-          />
-        </svg>
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: color }}>
-          <Icon size={16} />
-        </div>
-      </div>
-      <div style={{ fontFamily: 'Fira Code', fontSize: '0.75rem', color: 'var(--text-secondary)', letterSpacing: '1px' }}>{label} {(value || 0).toFixed(0)}%</div>
-    </div>
-  );
-};
+const DEFAULT_CURIOSITY_HOOKS = [
+  { question: "A teaspoon of neutron star weighs 6 billion tons. But why doesn't it collapse into a black hole?", category: "Astrophysics", difficulty: 2, hook_type: "paradox" },
+  { question: "You learned F=ma in school. What if I told you Newton's version is technically wrong?", category: "Physics", difficulty: 2, hook_type: "mindblown" },
+  { question: "Can you design a bridge that uses ONLY tension — no compression allowed?", category: "Engineering", difficulty: 3, hook_type: "challenge" },
+  { question: "What if Earth suddenly had two Suns? Would we even survive the first week?", category: "Astrophysics", difficulty: 1, hook_type: "whatif" },
+  { question: "Why does hot water freeze faster than cold water? Even scientists can't fully agree.", category: "Thermodynamics", difficulty: 2, hook_type: "paradox" },
+  { question: "If you fell into a black hole, you'd see the entire future of the universe flash before your eyes. Why?", category: "Relativity", difficulty: 3, hook_type: "mindblown" },
+  { question: "Can you calculate how much energy is stored in a single raisin using E=mc²?", category: "Nuclear Physics", difficulty: 1, hook_type: "challenge" },
+  { question: "What if gravity suddenly became 10x stronger right now? How long would buildings last?", category: "Physics", difficulty: 2, hook_type: "whatif" },
+  { question: "Why can you never actually touch anything? Quantum mechanics says it's impossible.", category: "Quantum Physics", difficulty: 1, hook_type: "paradox" },
+  { question: "What happens if you travel at the speed of light and turn on a flashlight?", category: "Relativity", difficulty: 2, hook_type: "whatif" }
+];
 
-function App() {
+export default function App() {
   const [state, setState] = useState({
     status: 'sleeping',
     mainText: 'System Standby',
-    subText: 'Say "Jarvis" to wake up'
+    subText: 'Say "Jarvis" or type a directive below'
   });
   const [chatHistory, setChatHistory] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
@@ -58,35 +43,78 @@ function App() {
   const [isSandboxModeActive, setIsSandboxModeActive] = useState(false);
   const [isNexusHubActive, setIsNexusHubActive] = useState(true); // Main landing home page
   const [curiosityQuestion, setCuriosityQuestion] = useState(null);
-  const [telemetry, setTelemetry] = useState({ cpu: 0, ram: 0, batt: 100 });
   const [commandText, setCommandText] = useState('');
-  const [curiosityHooks, setCuriosityHooks] = useState([]);
+  const [curiosityHooks, setCuriosityHooks] = useState(DEFAULT_CURIOSITY_HOOKS);
   const [isCuriosityDashboardOpen, setIsCuriosityDashboardOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState('chat'); // 'chat' | 'telemetry'
   const ws = useRef(null);
 
   useEffect(() => {
     let isSubscribed = true;
-    const socket = new WebSocket(WS_URL);
-    
-    socket.onopen = () => {
-      socket.send(JSON.stringify({ type: 'curiosity_feed_request' }));
-    };
+    let reconnectTimeout = null;
 
-    socket.onmessage = (event) => {
+    const connectWebSocket = () => {
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'curiosity_feed_response' && isSubscribed) {
-          setCuriosityHooks(data.hooks || []);
-          socket.close();
+        const socket = new WebSocket(WS_URL);
+        ws.current = socket;
+
+        socket.onopen = () => {
+          if (!isSubscribed) return;
+          socket.send(JSON.stringify({ type: 'curiosity_feed_request' }));
+          socket.send(JSON.stringify({ type: 'system_command', action: 'resume_voice_agent' }));
+        };
+
+        socket.onmessage = (event) => {
+          if (!isSubscribed) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'curiosity_feed_response' && data.hooks && data.hooks.length > 0) {
+              setCuriosityHooks(data.hooks);
+            } else if (data.type === 'state') {
+              setState({ status: data.state, mainText: data.main_text, subText: data.sub_text });
+            } else if (data.type === 'chat') {
+              setChatHistory(prev => {
+                // Deduplicate if user message was already added locally
+                if ((data.role === 'You' || data.role === 'user') && prev.length > 0) {
+                  const lastMsg = prev[prev.length - 1];
+                  if ((lastMsg.role === 'You' || lastMsg.role === 'user') && lastMsg.message === data.message) {
+                    return prev;
+                  }
+                }
+                return [...prev, { role: data.role, message: data.message }];
+              });
+            } else if (data.type === 'dashboard' || data.type === 'html_view') {
+              setDashboardData(data);
+            }
+          } catch {
+          }
+        };
+
+        socket.onclose = () => {
+          if (isSubscribed) {
+            setState({ status: 'sleeping', mainText: 'System Standby', subText: 'Connecting...' });
+            reconnectTimeout = setTimeout(connectWebSocket, 3000);
+          }
+        };
+
+        socket.onerror = () => {
+        };
+      } catch {
+        if (isSubscribed) {
+          reconnectTimeout = setTimeout(connectWebSocket, 3000);
         }
-      } catch (err) {
-        console.error("Error parsing curiosity feed", err);
       }
     };
 
+    connectWebSocket();
+
     return () => {
       isSubscribed = false;
-      socket.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws.current) {
+        ws.current.close();
+        ws.current = null;
+      }
     };
   }, []);
 
@@ -105,6 +133,8 @@ function App() {
       setIsArchitectModeActive(true);
     } else if (mode === 'sandbox') {
       setIsSandboxModeActive(true);
+    } else if (mode === 'assistant') {
+      // All mode flags are already false — the assistant HUD becomes visible
     }
   };
 
@@ -132,7 +162,7 @@ function App() {
       const gainNode = audioCtx.createGain();
       
       oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
       oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
       
       gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
@@ -147,192 +177,197 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    if (isNexusHubActive) {
-      if (ws.current) {
-        ws.current.close();
-        ws.current = null;
-      }
-      return;
+  const sendCommand = (text) => {
+    if (!text || text.trim() === '') return;
+    playBeep();
+    const cleanText = text.trim();
+    setChatHistory(prev => [...prev, { role: 'user', message: cleanText }]);
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ type: 'text_command', text: cleanText }));
     }
-
-    ws.current = new WebSocket(WS_URL);
-    
-    ws.current.onopen = () => {
-      ws.current.send(JSON.stringify({ type: 'system_command', action: 'resume_voice_agent' }));
-    };
-
-    ws.current.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'state') {
-          setState({ status: data.state, mainText: data.main_text, subText: data.sub_text });
-        } else if (data.type === 'chat') {
-          setChatHistory(prev => [...prev, { role: data.role, message: data.message }]);
-        } else if (data.type === 'dashboard' || data.type === 'html_view') {
-          setDashboardData(data);
-        } else if (data.type === 'telemetry') {
-          setTelemetry({ cpu: data.cpu, ram: data.ram, batt: data.batt });
-        }
-      } catch {
-      }
-    };
-
-    ws.current.onclose = () => {
-      setState({ status: 'sleeping', mainText: 'Connection Lost', subText: 'Trying to reconnect...' });
-    };
-
-    return () => { if (ws.current) { ws.current.close(); ws.current = null; } };
-  }, [isNexusHubActive]);
+    setCommandText('');
+  };
 
   const handleCommandSubmit = (e) => {
-    if (e.key === 'Enter' && commandText.trim() !== '') {
-      playBeep(); // Subtle sound effect
-      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ type: 'text_command', text: commandText }));
-      }
-      setCommandText('');
+    if (e.key === 'Enter') {
+      sendCommand(commandText);
     }
   };
 
   return (
     <>
-      <div className="hud-container" style={{ opacity: isNexusHubActive ? 0 : 1, pointerEvents: isNexusHubActive ? 'none' : 'auto', transition: 'opacity 0.3s ease' }}>
+      {/* =========================================================================
+          JARVIS AI ASSISTANT HUD (TELEMETRY + QUANTUM SIMULATION & COMPLETE CHAT)
+          ========================================================================= */}
+      <div 
+        className="hud-container assistant-stage-layout" 
+        style={{ 
+          opacity: isNexusHubActive ? 0 : 1, 
+          pointerEvents: isNexusHubActive ? 'none' : 'auto', 
+          transition: 'opacity 0.3s ease' 
+        }}
+      >
         <BackgroundFX status={state.status} />
         
-        {/* Top Right Settings Button */}
-        <button className="settings-btn" onClick={() => setIsSettingsOpen(true)}>
-          <Settings size={24} />
-        </button>
-
-        {/* Left Panel: Chat History */}
-        <motion.div 
-          className="glass-panel side-panel"
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <h2 className="panel-title"><Activity size={18} style={{display:'inline', marginRight:'10px', verticalAlign:'text-bottom'}}/> Comms Link</h2>
-          <ChatPanel history={chatHistory} />
-        </motion.div>
-
-        {/* Center Panel: Quantum Core & Telemetry */}
-        <motion.div 
-          className="center-panel"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {/* Holographic Telemetry HUD */}
-          <div className="telemetry-hud top-left">
-            <RadialProgress value={telemetry.cpu} icon={Cpu} label="CPU" color="var(--ethereal-cyan)" />
-          </div>
-          <div className="telemetry-hud middle-left">
-            <RadialProgress value={telemetry.ram} icon={MemoryStick} label="RAM" color="var(--ethereal-purple)" />
-          </div>
-          <div className="telemetry-hud bottom-left">
-            <RadialProgress value={telemetry.batt} icon={Battery} label="PWR" color="var(--ethereal-blue)" />
+        {/* Top Header Bar */}
+        <header className="assistant-header-bar">
+          <div className="assistant-header-left">
+            <button 
+              className="hud-nexus-return-btn"
+              onClick={handleReturnToNexus}
+              title="Return to Nexus Landing Page"
+            >
+              <Layers size={14} /> <span>NEXUS</span>
+            </button>
+            <div className="assistant-brand-tag">JARVIS <span style={{ opacity: 0.5 }}>// INTELLIGENCE</span></div>
           </div>
 
-          <InfinityCore state={state.status} />
+          <div className="assistant-header-center">
+            {/* Mobile Segmented Switcher */}
+            <div className="assistant-mobile-segmented-tab">
+              <button 
+                type="button" 
+                className={mobileTab === 'chat' ? 'is-active' : ''}
+                onClick={() => setMobileTab('chat')}
+              >
+                <Radio size={13} /> <span>Core & Chat</span>
+              </button>
+              <button 
+                type="button" 
+                className={mobileTab === 'telemetry' ? 'is-active' : ''}
+                onClick={() => setMobileTab('telemetry')}
+              >
+                <Activity size={13} /> <span>Telemetry</span>
+              </button>
+            </div>
+
+            <div className={`assistant-status-pill state-${state.status}`}>
+              <span className="status-indicator-dot" />
+              <span className="status-label">{state.status.toUpperCase()}</span>
+            </div>
+          </div>
+
+          <div className="assistant-header-right">
+            <button className="settings-btn" onClick={() => setIsSettingsOpen(true)} title="System Settings">
+              <Settings size={17} />
+            </button>
+          </div>
+        </header>
+
+        {/* Main Stage Grid (Left: Telemetry & Simulation, Right: Quantum Core & Complete Chat) */}
+        <main className="assistant-stage-grid">
           
-          <div className={`status-text state-${state.status}`}>
-            <div className="status-main">{state.mainText}</div>
-            <div className="status-sub">{state.subText}</div>
-          </div>
+          {/* Left Column: Telemetry & Live Simulations */}
+          <section className={`assistant-telemetry-pane ${mobileTab === 'telemetry' ? 'is-mobile-active' : ''}`}>
+            <div className="assistant-pane-header">
+              <div className="assistant-pane-title">
+                <Activity size={15} /> <span>TELEMETRY & INTELLIGENCE</span>
+              </div>
+              <span className="assistant-comms-count">SYSTEM 2.5</span>
+            </div>
 
-          {/* Hacker-Style Text Input under the Core */}
-          <div className="command-line-wrapper">
-            <span className="command-prompt">&gt;</span>
-            <input 
-              type="text" 
-              className="command-input" 
-              placeholder="Awaiting directive..." 
-              value={commandText}
-              onChange={(e) => setCommandText(e.target.value)}
-              onKeyDown={handleCommandSubmit}
-              autoFocus
-            />
-          </div>
-        </motion.div>
+            <div className="assistant-telemetry-scroll-area">
+              <DataPanel data={dashboardData} status={state.status} />
+            </div>
+          </section>
 
-        {/* Right Panel: Data Dashboard */}
-        <motion.div 
-          className="glass-panel data-panel"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <h2 className="panel-title"><Activity size={18} style={{display:'inline', marginRight:'10px', verticalAlign:'text-bottom'}}/> Telemetry & Data</h2>
-          <DataPanel data={dashboardData} />
-        </motion.div>
+          {/* Right Column: Quantum Core Simulation & Complete Chat Stream */}
+          <section className={`assistant-main-chat-pane ${mobileTab === 'chat' ? 'is-mobile-active' : ''}`}>
+            
+            {/* Top Stage: 3D Quantum Core Simulation & Live Status */}
+            <div className="assistant-core-stage-wrapper">
+              <div className="assistant-orb-container">
+                <InfinityCore state={state.status} />
+              </div>
+              <div className={`status-text state-${state.status}`}>
+                <div className="status-main">{state.mainText || "SYSTEM ACTIVE"}</div>
+                {state.subText && <div className="status-sub">{state.subText}</div>}
+              </div>
+            </div>
 
-        {/* Top Center Return to NEXUS Home Button (Inside Assistant HUD) */}
-        <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
-          <button 
-            onClick={handleReturnToNexus}
-            style={{
-              background: 'rgba(157, 78, 221, 0.15)',
-              border: '1px solid rgba(157, 78, 221, 0.4)',
-              color: '#9d4edd',
-              padding: '10px 20px',
-              borderRadius: '25px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              fontFamily: 'Orbitron',
-              boxShadow: '0 0 15px rgba(157, 78, 221, 0.3)'
-            }}
-          >
-            <Layers size={20} /> JARVIS NEXUS HOME
-          </button>
-        </div>
+            {/* Middle Stage: Complete Conversational Dialogue Stream */}
+            <div className="assistant-chat-stream-window">
+              <ChatPanel history={chatHistory} theme="default" />
+            </div>
+
+            {/* Bottom Interactive Command Bar */}
+            <div className="assistant-terminal-bar">
+              <span className="command-prompt">&gt;</span>
+              <input 
+                type="text" 
+                className="command-input" 
+                placeholder="Ask Jarvis anything or speak directive..." 
+                value={commandText}
+                onChange={(e) => setCommandText(e.target.value)}
+                onKeyDown={handleCommandSubmit}
+                autoFocus
+              />
+              <button 
+                type="button"
+                className="assistant-send-btn"
+                onClick={() => sendCommand(commandText)}
+                disabled={!commandText.trim()}
+                title="Send Command"
+              >
+                <Send size={15} />
+              </button>
+            </div>
+          </section>
+        </main>
 
         {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
       </div>
 
-      {isNexusHubActive && curiosityHooks.length > 0 && (
+      {/* Global Curiosity Orb & Dashboard Modal */}
+      {isNexusHubActive && !isCuriosityDashboardOpen && (
         <CuriosityOrb 
           hooks={curiosityHooks} 
-          onLaunchCuriosity={handleLaunchCuriosity} 
-          onOpenDashboard={() => setIsCuriosityDashboardOpen(true)} 
+          onOpenDashboard={() => setIsCuriosityDashboardOpen(true)}
+          onSelectHook={handleLaunchCuriosity}
         />
       )}
-      <AnimatePresence>
-        {isNexusHubActive && isCuriosityDashboardOpen && (
-          <CuriosityDashboard 
-            hooks={curiosityHooks} 
-            onClose={() => setIsCuriosityDashboardOpen(false)} 
-            onLaunchCuriosity={handleLaunchCuriosity} 
-          />
-        )}
-      </AnimatePresence>
 
-      {/* Overlays & Modals */}
+      {isCuriosityDashboardOpen && (
+        <CuriosityDashboard
+          hooks={curiosityHooks}
+          onClose={() => setIsCuriosityDashboardOpen(false)}
+          onSelectHook={handleLaunchCuriosity}
+        />
+      )}
+
+      {/* NEXUS Main Landing Experience */}
       <NexusHubModal 
         isActive={isNexusHubActive}
-        onClose={() => setIsNexusHubActive(false)} 
+        isOpen={isNexusHubActive}
         onLaunchMode={handleLaunchMode}
         onLaunchCuriosity={handleLaunchCuriosity}
+        curiosityHooks={curiosityHooks}
       />
-      
+
+      {/* Full-Screen Workspaces */}
       <AnimatePresence>
         {isProfessorModeActive && (
-          <ProfessorMode onExit={handleReturnToNexus} curiosityQuestion={curiosityQuestion} />
+          <ProfessorMode 
+            initialQuestion={curiosityQuestion}
+            onExit={handleReturnToNexus} 
+          />
         )}
         {isStudyGroupModeActive && (
-          <StudyGroupMode onExit={handleReturnToNexus} />
+          <StudyGroupMode 
+            onExit={handleReturnToNexus} 
+          />
         )}
         {isArchitectModeActive && (
-          <ArchitectMode onExit={handleReturnToNexus} />
+          <ArchitectMode 
+            onExit={handleReturnToNexus} 
+          />
         )}
         {isSandboxModeActive && (
-          <SandboxMode onExit={handleReturnToNexus} />
+          <SandboxMode 
+            onExit={handleReturnToNexus} 
+          />
         )}
       </AnimatePresence>
     </>
   );
 }
-
-export default App;
