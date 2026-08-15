@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
 import Plot from 'react-plotly.js';
 import { Cpu, Activity, Zap, Database, Radio, Globe, Shield, Sparkles, Orbit, Maximize2, Minimize2 } from 'lucide-react';
+import { API_URL } from '../config';
+
+const resolveSimulationUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://localhost:8000') && API_URL && !API_URL.includes('localhost:8000')) {
+    return url.replace('http://localhost:8000', API_URL);
+  }
+  return url;
+};
 
 const DataPanel = ({ data, status = 'sleeping' }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Handle fully self-contained HTML rendering (Physics Simulations)
   if (data && data.type === 'html_view' && data.html_url) {
+    const safeSimulationUrl = resolveSimulationUrl(data.html_url);
     return (
       <>
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -42,7 +52,7 @@ const DataPanel = ({ data, status = 'sleeping' }) => {
           </div>
           <div style={{ flex: 1, minHeight: '380px', width: '100%', height: '100%', position: 'relative' }}>
             <iframe 
-              src={data.html_url} 
+              src={safeSimulationUrl} 
               style={{ width: '100%', height: '100%', minHeight: '380px', border: '1px solid rgba(110, 246, 247, 0.25)', borderRadius: '12px', background: '#030508' }}
               title="Physics Simulation"
             />
@@ -80,7 +90,7 @@ const DataPanel = ({ data, status = 'sleeping' }) => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  fontFamily: 'DM Mono, monospace',
+                  fontFamily: 'DM Mono',
                   fontSize: '12px'
                 }}
               >
@@ -88,7 +98,7 @@ const DataPanel = ({ data, status = 'sleeping' }) => {
               </button>
             </div>
             <iframe 
-              src={data.html_url} 
+              src={safeSimulationUrl} 
               style={{ width: '100%', height: '100%', flex: 1, border: '1px solid rgba(110, 246, 247, 0.3)', borderRadius: '16px', background: '#030508' }}
               title="Fullscreen Physics Simulation"
             />

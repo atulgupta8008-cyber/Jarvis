@@ -109,9 +109,10 @@ async def simulate_physics(prompt: str) -> str:
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(raw_code.strip())
             
-        # 2. Execute the script asynchronously
+        # 2. Execute the script asynchronously using the current Python environment (virtualenv compatible)
+        import sys
         process = await asyncio.create_subprocess_exec(
-            "python", script_path,
+            sys.executable, script_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -123,7 +124,9 @@ async def simulate_physics(prompt: str) -> str:
             return f"Error executing simulation: {error_msg}"
             
         if os.path.exists(output_html_path):
-            return f"http://localhost:8000/static/simulations/{output_html_name}"
+            backend_url = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("BACKEND_URL") or "http://localhost:8000"
+            backend_url = backend_url.rstrip("/")
+            return f"{backend_url}/static/simulations/{output_html_name}"
         else:
             return "Simulation ran successfully, but the output HTML was not created."
             

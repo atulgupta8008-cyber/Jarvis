@@ -22,7 +22,7 @@ function setNodeLoading(node, targetId, variable) {
     : node;
 }
 
-export default function ProfessorMode({ onExit, curiosityQuestion }) {
+export default function ProfessorMode({ onExit, initialQuestion, curiosityQuestion }) {
   const [chatHistory, setChatHistory] = useState([]);
   const [blackboardWidgets, setBlackboardWidgets] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -35,7 +35,25 @@ export default function ProfessorMode({ onExit, curiosityQuestion }) {
   const [isThinking, setIsThinking] = useState(false);
   const [currentAct, setCurrentAct] = useState(0);
   const ws = useRef(null);
-  const pendingQuestion = useRef(curiosityQuestion);
+  const questionToAsk = initialQuestion || curiosityQuestion;
+  const pendingQuestion = useRef(questionToAsk);
+
+  useEffect(() => {
+    if (questionToAsk) {
+      pendingQuestion.current = questionToAsk;
+      if (activeSessionId && ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({ 
+          type: 'professor_query', 
+          text: questionToAsk, 
+          files: [], 
+          session_id: activeSessionId,
+          deep_research: false 
+        }));
+        setChatHistory(prev => [...prev, { role: 'user', message: questionToAsk }]);
+        pendingQuestion.current = null;
+      }
+    }
+  }, [initialQuestion, curiosityQuestion, activeSessionId]);
 
   useEffect(() => {
     ws.current = new WebSocket(WS_URL);

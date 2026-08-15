@@ -3,6 +3,15 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import mermaid from 'mermaid';
 import { Minus, X, Activity, Type, GitMerge } from 'lucide-react';
 import FractalEquation from './FractalEquation';
+import { API_URL } from '../config';
+
+const resolveSimulationUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://localhost:8000') && API_URL && !API_URL.includes('localhost:8000')) {
+    return url.replace('http://localhost:8000', API_URL);
+  }
+  return url;
+};
 
 mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 
@@ -154,7 +163,7 @@ const WidgetCard = ({ widget, onMinimize, onRemove, onFractalExpand }) => {
       >
         {widget.type === 'simulation' ? (
           <iframe 
-            src={widget.content} 
+            src={resolveSimulationUrl(widget.content)} 
             style={{ width: '100%', height: '100%', minHeight: '400px', border: 'none', background: 'transparent' }}
             title="Simulation"
           />
