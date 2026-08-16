@@ -3,7 +3,7 @@ import { motion, useInView, AnimatePresence } from 'framer-motion';
 import {
   ArrowDownRight, ArrowRight, Bot, BrainCircuit, Compass,
   Cpu, Mic, Orbit, ShieldCheck, Sparkles, Users, Menu, X,
-  Layers, Zap, BookOpen, FlaskConical, HelpCircle, Flame
+  Layers, Zap, BookOpen, FlaskConical, HelpCircle, Flame, MessageSquare
 } from 'lucide-react';
 import OrbitalCore from './OrbitalCore';
 import './NexusLanding.css';
@@ -80,7 +80,7 @@ const stats = [
   { value: 'VOICE', label: 'NATIVE COMMANDS' },
 ];
 
-export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaunchCuriosity, onOpenCuriosityDashboard }) {
+export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaunchCuriosity, onOpenCuriosityDashboard, onOpenFeedback }) {
   const [scroll, setScroll] = useState(0);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -134,6 +134,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
           <button className="nav-link" onClick={() => jump('modes')}>Modes</button>
           <button className="nav-link" onClick={() => jump('curiosity')}>Curiosity Feed</button>
           <button className="nav-link" onClick={() => jump('core')}>Core</button>
+          <button className="nav-link" onClick={onOpenFeedback} style={{ color: 'var(--cyan, #6ef6f7)' }}>Feedback</button>
         </div>
         <div className="nav-right">
           <button className="btn-launch" onClick={() => go('professor')}>Open Jarvis <ArrowRight size={14} /></button>
@@ -156,9 +157,17 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
                 onClick={() => jump(label.toLowerCase().replace(' ', '-'))}
               >{label}</motion.button>
             ))}
+            <motion.button className="mob-link"
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              onClick={() => { setMobileMenu(false); onOpenFeedback?.(); }}
+              style={{ color: 'var(--cyan, #6ef6f7)' }}
+            >
+              Feedback & Signals
+            </motion.button>
             <motion.button className="btn-launch" style={{ marginTop: 16 }}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.34 }}
+              transition={{ delay: 0.36 }}
               onClick={() => go('professor')}
             >Open Jarvis <ArrowRight size={14} /></motion.button>
           </motion.div>
@@ -428,8 +437,29 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
           </div>
           <span>Personal intelligence for purposeful work.</span>
         </div>
-        <div className="footer-right">
-          <ShieldCheck size={13} /> Local interface · 2026
+        <div className="footer-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button
+            type="button"
+            onClick={onOpenFeedback}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--cyan, #6ef6f7)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontFamily: 'DM Mono, monospace',
+              fontSize: '11px',
+              padding: 0
+            }}
+          >
+            <MessageSquare size={13} /> Share Feedback
+          </button>
+          <span>·</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <ShieldCheck size={13} /> 2026
+          </span>
         </div>
       </footer>
     </div>

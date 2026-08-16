@@ -626,6 +626,47 @@ class SettingsModel(BaseModel):
     keys: dict
     preferences: dict
 
+class FeedbackModel(BaseModel):
+    name: str = "Anonymous Explorer"
+    email: str = "no-reply@jarvis-os.ai"
+    topic: str = "General Feedback"
+    rating: str = "5 / 5 Stars"
+    message: str
+    diagnostics: str = ""
+
+@app.post("/api/feedback")
+async def submit_feedback(data: FeedbackModel):
+    access_key = os.getenv("WEB3FORMS_ACCESS_KEY") or os.getenv("VITE_WEB3FORMS_ACCESS_KEY") or "430cbfce-3745-4425-959e-a9909eb7c128"
+    if not access_key:
+        raise HTTPException(status_code=500, detail="Web3Forms access key not configured on server.")
+    
+    payload = {
+        "access_key": access_key,
+        "subject": f"[Jarvis Feedback] {data.topic} from {data.name}",
+        "from_name": data.name,
+        "name": data.name,
+        "email": data.email,
+        "topic": data.topic,
+        "rating": data.rating,
+        "message": data.message,
+        "diagnostics": data.diagnostics,
+        "botcheck": ""
+    }
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "https://api.web3forms.com/submit",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Accept": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_body = response.read().decode("utf-8")
+            res_json = json.loads(res_body)
+            return res_json
+    except Exception as e:
+        print(f"Error submitting feedback via backend: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/settings")
 def get_settings(request: Request):
     if not is_local_client(request.client.host if request.client else None):

@@ -3,3 +3,4 @@ const defaultApiUrl = `${window.location.protocol}//${window.location.hostname}:
 
 export const API_URL = configuredApiUrl || defaultApiUrl;
 export const WS_URL = `${API_URL.replace(/^http/, 'ws')}/ws`;
+export const WEB3FORMS_ACCESS_KEY = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '';

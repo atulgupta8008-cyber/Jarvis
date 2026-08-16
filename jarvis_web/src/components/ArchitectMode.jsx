@@ -56,8 +56,6 @@ export default function ArchitectMode({ onExit }) {
         // INTERCEPTOR LOGIC
         if (data.type === 'professor_chat') {
           setResearchStatus('');
-          const act = data.message.match(/\[ACT:(\d)\]/);
-          if (act) setCurrentAct(Number(act[1]));
           const message = data.message.replace(/\[ACT:\d\]/g, '').trim();
           setChatHistory(prev => [...prev.filter(item => !item.isStreaming), { role: data.role, message, teaching_score: data.teaching_score }]);
         } else if (data.type === 'professor_history_loaded') {
@@ -259,41 +257,31 @@ export default function ArchitectMode({ onExit }) {
             theme="architect"
           />
           
-          {/* Deep Research Terminal Overlay */}
           <AnimatePresence>
             {researchStatus && (
               <motion.div 
                 className="workspace-research-status"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
+                exit={{ opacity: 0, y: -10 }}
               >
-                <h3>&gt; SYSTEM.SWARM_PROTOCOL</h3>
-                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <motion.p 
-                    key={researchStatus}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                  >
-                    {researchStatus}
-                    <motion.span
-                      animate={{ opacity: [0, 1, 0] }}
-                      transition={{ repeat: Infinity, duration: 0.8 }}
-                    >_</motion.span>
-                  </motion.p>
-                </div>
+                <span>{researchStatus}</span>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Board Pane */}
+        {/* Blackboard / Graph Pane */}
         <div className={`workspace-board ${mobilePane === 'board' ? 'is-mobile-active' : ''}`}>
-          <Blackboard widgets={blackboardWidgets} setWidgets={setBlackboardWidgets} onFractalExpand={expandFractal} />
+          <Blackboard 
+            widgets={blackboardWidgets} 
+            setWidgets={setBlackboardWidgets} 
+            onFractalExpand={expandFractal} 
+          />
         </div>
       </main>
 
-      {/* Sessions Sidebar Overlay */}
+      {/* Sidebar Drawer */}
       <AnimatePresence>
         {isSessionsOpen && (
           <>

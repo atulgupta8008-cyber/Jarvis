@@ -7,9 +7,12 @@
   flex-direction: column !important;
   width: 100vw !important;
   height: 100vh !important;
+  height: 100dvh !important;
   padding: 12px 16px !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
+  position: fixed !important;
+  inset: 0 !important;
 }
 
 .study-group-header {
@@ -434,17 +437,29 @@
     display: none !important;
     width: 100% !important;
     max-width: 100% !important;
-    flex: 1 1 auto !important;
+    flex: 1 1 0% !important;
     min-height: 0 !important;
     height: 100% !important;
-    padding: 10px !important;
-    border-radius: 16px !important;
+    padding: 8px !important;
+    border-radius: 14px !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   .study-mobile-chat-pane.is-mobile-active,
   .study-center-pane.is-mobile-active {
     display: flex !important;
     flex-direction: column !important;
+  }
+
+  .study-agent-chat-body {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  .study-pitch-dock {
+    flex-shrink: 0 !important;
+    padding: 6px 8px !important;
   }
 }

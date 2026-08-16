@@ -2,8 +2,17 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 
-export default function CuriosityDashboard({ hooks, onClose, onLaunchCuriosity }) {
+export default function CuriosityDashboard({ hooks = [], onClose, onLaunchCuriosity, onSelectHook }) {
   
+  const handleSelect = (question) => {
+    if (onLaunchCuriosity) {
+      onLaunchCuriosity(question);
+    } else if (onSelectHook) {
+      onSelectHook(question);
+    }
+    onClose?.();
+  };
+
   const getGlowColor = (type) => {
     switch (type) {
       case 'paradox': return 'rgba(239, 68, 68, 0.6)'; // red
@@ -70,7 +79,7 @@ export default function CuriosityDashboard({ hooks, onClose, onLaunchCuriosity }
             key={index}
             whileHover={{ scale: 1.02, y: -5 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => onLaunchCuriosity(hook.question)}
+            onClick={() => handleSelect(hook.question)}
             style={{
               background: 'rgba(255, 255, 255, 0.03)',
               border: '1px solid rgba(255, 255, 255, 0.1)',

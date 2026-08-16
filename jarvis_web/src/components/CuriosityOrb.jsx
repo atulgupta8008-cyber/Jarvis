@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 
-export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard }) {
+export default function CuriosityOrb({ hooks, onLaunchCuriosity, onSelectHook, onOpenDashboard }) {
   const [activeHook, setActiveHook] = useState(null);
 
   useEffect(() => {
@@ -20,6 +20,14 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
 
     return () => clearInterval(intervalId);
   }, [hooks]);
+
+  const handleLaunch = (question) => {
+    if (onLaunchCuriosity) {
+      onLaunchCuriosity(question);
+    } else if (onSelectHook) {
+      onSelectHook(question);
+    }
+  };
 
   return (
     <div style={{
@@ -39,7 +47,7 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
             exit={{ opacity: 0, x: 10, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 150, damping: 25 }}
             onClick={() => {
-              onLaunchCuriosity(activeHook.question);
+              handleLaunch(activeHook.question);
               setActiveHook(null);
             }}
             style={{

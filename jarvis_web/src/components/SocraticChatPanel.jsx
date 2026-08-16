@@ -82,7 +82,7 @@ export default function SocraticChatPanel({
   };
 
   return (
-    <div {...getRootProps()} className="socratic-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', position: 'relative', outline: 'none' }}>
+    <div {...getRootProps()} className="socratic-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', flex: '1 1 0%', minHeight: 0, position: 'relative', overflow: 'hidden', outline: 'none' }}>
       <input {...getInputProps()} />
       
       {isDragActive && (
@@ -105,11 +105,12 @@ export default function SocraticChatPanel({
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px', position: 'relative', paddingRight: '5px' }}>
+      {/* Shrinkable Chat Stream Area */}
+      <div className="socratic-chat-scroll-area" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', marginBottom: '8px', position: 'relative', paddingRight: '4px' }}>
         {isEpiphanyMode && currentAct > 0 && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '12px',
-            padding: '8px 12px', marginBottom: '12px',
+            padding: '6px 10px', marginBottom: '8px',
             background: 'linear-gradient(90deg, rgba(255, 215, 0, 0.03) 0%, transparent 100%)',
             borderLeft: '2px solid rgba(255, 215, 0, 0.4)', borderRadius: '0 8px 8px 0',
             fontFamily: 'DM Mono, monospace', fontSize: '0.7rem', fontWeight: 500,
@@ -119,7 +120,7 @@ export default function SocraticChatPanel({
             <div style={{ display: 'flex', gap: '4px' }}>
               {[1, 2, 3].map(act => (
                 <div key={act} style={{
-                  width: '40px', height: '3px', borderRadius: '1.5px',
+                  width: '32px', height: '3px', borderRadius: '1.5px',
                   background: act <= currentAct ? 'rgba(255, 215, 0, 0.6)' : 'rgba(255, 215, 0, 0.1)',
                   transition: 'all 0.4s ease'
                 }} />
@@ -134,13 +135,13 @@ export default function SocraticChatPanel({
         
         {isThinking && (
           <div style={{
-            display: 'flex', flexDirection: 'column', padding: '12px 16px', marginTop: '12px',
+            display: 'flex', flexDirection: 'column', padding: '10px 14px', marginTop: '8px',
             background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 0%, transparent 100%)', 
             borderLeft: '2px solid var(--cyan, #6ef6f7)', borderRadius: '0 8px 8px 0',
             color: '#8e9bb9', fontSize: '0.85rem', fontFamily: 'Space Grotesk, sans-serif',
             overflow: 'hidden', position: 'relative'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontWeight: 600, color: '#f4f7ff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', fontWeight: 600, color: '#f4f7ff' }}>
               <div className="pulse-dot" style={{ background: 'var(--cyan, #6ef6f7)' }}></div>
               <span>Processing</span>
             </div>
@@ -167,14 +168,14 @@ export default function SocraticChatPanel({
         )}
       </div>
 
-      {/* Input Bar with Direct Media Vault Button */}
-      <div style={{ 
+      {/* Fixed Bottom Input Bar */}
+      <div className="socratic-input-bar" style={{ 
         position: 'relative', display: 'flex', alignItems: 'center', 
         background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.08)', 
-        borderRadius: '24px', padding: '6px 10px', backdropFilter: 'blur(10px)',
-        gap: '6px'
+        borderRadius: '24px', padding: '4px 8px', backdropFilter: 'blur(10px)',
+        gap: '6px', flexShrink: 0
       }}>
-        {/* New Media Vault File Button (Replaces old one-off attachment) */}
+        {/* Session Media Vault Button */}
         {onOpenMediaVault && (
           <button
             type="button"
@@ -184,10 +185,10 @@ export default function SocraticChatPanel({
               background: mediaCount > 0 ? 'rgba(110, 246, 247, 0.12)' : 'rgba(255, 255, 255, 0.04)',
               border: mediaCount > 0 ? '1px solid rgba(110, 246, 247, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '16px',
-              padding: '6px 10px',
+              padding: '5px 8px',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '5px',
               cursor: 'pointer',
               color: mediaCount > 0 ? 'var(--cyan, #6ef6f7)' : '#8e9bb9',
               fontFamily: 'DM Mono, monospace',
@@ -196,21 +197,21 @@ export default function SocraticChatPanel({
               flexShrink: 0
             }}
           >
-            <FolderLock size={14} />
+            <FolderLock size={13} />
             <span>Vault</span>
             {mediaCount > 0 ? (
               <span style={{
                 background: 'var(--cyan, #6ef6f7)',
                 color: '#030508',
                 borderRadius: '8px',
-                padding: '0 5px',
+                padding: '0 4px',
                 fontWeight: '700',
-                fontSize: '10px'
+                fontSize: '9px'
               }}>
                 {mediaCount}
               </span>
             ) : (
-              <Plus size={12} style={{ opacity: 0.6 }} />
+              <Plus size={11} style={{ opacity: 0.6 }} />
             )}
           </button>
         )}
@@ -220,10 +221,11 @@ export default function SocraticChatPanel({
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={theme === 'architect' ? "Explain the system to Young Jarvis..." : "Ask Professor Jarvis..."}
+          placeholder={theme === 'architect' ? "Explain system..." : "Ask Professor Jarvis..."}
           style={{
-            flex: 1, padding: '10px 6px', background: 'transparent', border: 'none',
-            color: '#f4f7ff', fontFamily: 'Space Grotesk, sans-serif', outline: 'none', fontSize: '0.95rem'
+            flex: 1, padding: '8px 6px', background: 'transparent', border: 'none',
+            color: '#f4f7ff', fontFamily: 'Space Grotesk, sans-serif', outline: 'none', fontSize: '0.9rem',
+            minWidth: 0
           }}
         />
         
@@ -232,54 +234,56 @@ export default function SocraticChatPanel({
           disabled={!inputText.trim()}
           style={{
             background: inputText.trim() ? 'var(--cyan, #6ef6f7)' : 'rgba(255,255,255,0.04)',
-            border: 'none', borderRadius: '50%', padding: '10px', 
+            border: 'none', borderRadius: '50%', width: '32px', height: '32px', 
             cursor: inputText.trim() ? 'pointer' : 'default',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: inputText.trim() ? '#030508' : '#4a5568',
-            transition: 'all 0.25s ease'
+            transition: 'all 0.25s ease',
+            flexShrink: 0
           }}
         >
-          <Send size={16} />
+          <Send size={14} />
         </button>
       </div>
       
-      {/* Socratic Cognitive Tools (Neo/Zen removed) */}
+      {/* Fixed Bottom Cognitive Mode Switching Keys */}
       {theme !== 'architect' && (
-        <div style={{ 
-          marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-          padding: '6px 14px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.04)',
-          borderRadius: '20px', backdropFilter: 'blur(4px)', alignSelf: 'center'
+        <div className="socratic-cognitive-tools" style={{ 
+          marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+          padding: '4px 10px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.04)',
+          borderRadius: '20px', backdropFilter: 'blur(4px)', alignSelf: 'center', flexShrink: 0,
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.02)', padding: '4px 8px', borderRadius: '12px' }}>
-            <Atom size={12} style={{ color: isColliderMode ? '#a78bfa' : '#4a5568' }} />
-            <span style={{ color: isColliderMode ? '#f4f7ff' : '#8e9bb9', fontSize: '0.62rem', fontFamily: 'DM Mono, monospace', fontWeight: '500' }}>Collide</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.02)', padding: '3px 7px', borderRadius: '10px' }}>
+            <Atom size={11} style={{ color: isColliderMode ? '#a78bfa' : '#4a5568' }} />
+            <span style={{ color: isColliderMode ? '#f4f7ff' : '#8e9bb9', fontSize: '0.6rem', fontFamily: 'DM Mono, monospace', fontWeight: '500' }}>Collide</span>
             <div onClick={() => setIsColliderMode(!isColliderMode)} style={{
-              width: '24px', height: '14px', borderRadius: '7px', cursor: 'pointer', position: 'relative',
+              width: '22px', height: '13px', borderRadius: '7px', cursor: 'pointer', position: 'relative',
               background: isColliderMode ? '#a78bfa' : 'rgba(255,255,255,0.08)', transition: 'background 0.25s ease'
             }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: isColliderMode ? '12px' : '2px', transition: 'left 0.25s ease' }} />
+              <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: isColliderMode ? '11px' : '2px', transition: 'left 0.25s ease' }} />
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.02)', padding: '4px 8px', borderRadius: '12px' }}>
-            <Sparkles size={12} style={{ color: isEpiphanyMode ? 'rgba(255,215,0,0.8)' : '#4a5568' }} />
-            <span style={{ color: isEpiphanyMode ? '#f4f7ff' : '#8e9bb9', fontSize: '0.62rem', fontFamily: 'DM Mono, monospace', fontWeight: '500' }}>Epiphany</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.02)', padding: '3px 7px', borderRadius: '10px' }}>
+            <Sparkles size={11} style={{ color: isEpiphanyMode ? 'rgba(255,215,0,0.8)' : '#4a5568' }} />
+            <span style={{ color: isEpiphanyMode ? '#f4f7ff' : '#8e9bb9', fontSize: '0.6rem', fontFamily: 'DM Mono, monospace', fontWeight: '500' }}>Epiphany</span>
             <div onClick={() => setIsEpiphanyMode(!isEpiphanyMode)} style={{
-              width: '24px', height: '14px', borderRadius: '7px', cursor: 'pointer', position: 'relative',
+              width: '22px', height: '13px', borderRadius: '7px', cursor: 'pointer', position: 'relative',
               background: isEpiphanyMode ? 'rgba(255,215,0,0.8)' : 'rgba(255,255,255,0.08)', transition: 'background 0.25s ease'
             }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: isEpiphanyMode ? '12px' : '2px', transition: 'left 0.25s ease' }} />
+              <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: isEpiphanyMode ? '11px' : '2px', transition: 'left 0.25s ease' }} />
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.02)', padding: '4px 8px', borderRadius: '12px' }}>
-            <Network size={12} style={{ color: isDeepResearch ? 'var(--cyan, #6ef6f7)' : '#4a5568' }} />
-            <span style={{ color: isDeepResearch ? '#f4f7ff' : '#8e9bb9', fontSize: '0.62rem', fontFamily: 'DM Mono, monospace', fontWeight: '500' }}>Research</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.02)', padding: '3px 7px', borderRadius: '10px' }}>
+            <Network size={11} style={{ color: isDeepResearch ? 'var(--cyan, #6ef6f7)' : '#4a5568' }} />
+            <span style={{ color: isDeepResearch ? '#f4f7ff' : '#8e9bb9', fontSize: '0.6rem', fontFamily: 'DM Mono, monospace', fontWeight: '500' }}>Research</span>
             <div onClick={() => setIsDeepResearch(!isDeepResearch)} style={{
-              width: '24px', height: '14px', borderRadius: '7px', cursor: 'pointer', position: 'relative',
+              width: '22px', height: '13px', borderRadius: '7px', cursor: 'pointer', position: 'relative',
               background: isDeepResearch ? 'var(--cyan, #6ef6f7)' : 'rgba(255,255,255,0.08)', transition: 'background 0.25s ease'
             }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: isDeepResearch ? '12px' : '2px', transition: 'left 0.25s ease' }} />
+              <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: isDeepResearch ? '11px' : '2px', transition: 'left 0.25s ease' }} />
             </div>
           </div>
         </div>

@@ -272,7 +272,6 @@ export default function StudyGroupMode({ onExit }) {
             <Layout size={13} /> Blackboard {blackboardWidgets.length > 0 && `(${blackboardWidgets.length})`}
           </button>
         </div>
-
         <div className="study-group-header-actions">
           <button className="workspace-exit" onClick={onExit}>
             <LogOut size={14} /> Exit
@@ -302,7 +301,7 @@ export default function StudyGroupMode({ onExit }) {
           <div className="study-agent-header ada-header">
             <div className="study-agent-badge ada-dot" />
             <div className="study-agent-name">
-              Ada <span className="study-agent-role">CREATIVE</span>
+              Ada <span className="study-agent-role">ADVOCATE</span>
             </div>
             {isThinking && <span className="agent-thinking-pill">Thinking...</span>}
           </div>
@@ -311,21 +310,22 @@ export default function StudyGroupMode({ onExit }) {
           </div>
         </section>
 
-        {/* MOBILE WINDOW 1: Unified Debate Chat Stream (Both Vance & Ada + User) with Input */}
-        <section className={`study-mobile-chat-pane mobile-only-pane ${mobileTab === 'chat' ? 'is-mobile-active' : ''}`}>
+        {/* WINDOW 1 (Mobile Debate Chat Only): Unified Vance & Ada Chat with Mobile Pitch Console */}
+        <section className={`study-mobile-chat-pane ${mobileTab === 'chat' ? 'is-mobile-active' : ''}`}>
           <div className="study-mobile-chat-header">
             <div className="study-mobile-agents-status">
-              <span className="agent-tag vance"><span className="study-agent-badge vance-dot" /> Dr. Vance</span>
-              <span className="agent-divider">vs</span>
-              <span className="agent-tag ada"><span className="study-agent-badge ada-dot" /> Ada</span>
+              <span className="agent-tag vance">Dr. Vance (Skeptic)</span>
+              <span className="agent-divider">⚡</span>
+              <span className="agent-tag ada">Ada (Advocate)</span>
             </div>
-            {isThinking && <span className="agent-thinking-pill">Thinking...</span>}
+            {isThinking && <span className="agent-thinking-pill">Processing...</span>}
           </div>
-          
+
           <div className="study-agent-chat-body">
             <ChatPanel history={chatHistory} theme="professor" />
           </div>
 
+          {/* Unified Bottom Pitch Dock for Mobile */}
           {renderPitchDock(true)}
         </section>
 

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Layers, Send, Activity, Radio, Cpu, Sparkles, MessageSquare } from 'lucide-react';
+import { Layers, Send, Activity, Radio, Cpu, Sparkles, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import InfinityCore from './components/InfinityCore';
 import ChatPanel from './components/ChatPanel';
 import DataPanel from './components/DataPanel';
-import SettingsModal from './components/SettingsModal';
 import ProfessorMode from './components/ProfessorMode';
 import StudyGroupMode from './components/StudyGroupMode';
 import ArchitectMode from './components/ArchitectMode';
@@ -13,6 +12,7 @@ import NexusHubModal from './components/NexusHubModal';
 import BackgroundFX from './components/BackgroundFX';
 import CuriosityOrb from './components/CuriosityOrb';
 import CuriosityDashboard from './components/CuriosityDashboard';
+import FeedbackModal from './components/FeedbackModal';
 import { WS_URL } from './config';
 
 const DEFAULT_CURIOSITY_HOOKS = [
@@ -36,7 +36,7 @@ export default function App() {
   });
   const [chatHistory, setChatHistory] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isProfessorModeActive, setIsProfessorModeActive] = useState(false);
   const [isStudyGroupModeActive, setIsStudyGroupModeActive] = useState(false);
   const [isArchitectModeActive, setIsArchitectModeActive] = useState(false);
@@ -246,12 +246,6 @@ export default function App() {
               <span className="status-label">{state.status.toUpperCase()}</span>
             </div>
           </div>
-
-          <div className="assistant-header-right">
-            <button className="settings-btn" onClick={() => setIsSettingsOpen(true)} title="System Settings">
-              <Settings size={17} />
-            </button>
-          </div>
         </header>
 
         {/* Main Stage Grid (Left: Telemetry & Simulation, Right: Quantum Core & Complete Chat) */}
@@ -299,14 +293,21 @@ export default function App() {
                 placeholder="Ask Jarvis anything or speak directive..." 
                 value={commandText}
                 onChange={(e) => setCommandText(e.target.value)}
-                onKeyDown={handleCommandSubmit}
-                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && commandText.trim()) {
+                    sendCommand(commandText);
+                  }
+                }}
               />
               <button 
                 type="button"
                 className="assistant-send-btn"
-                onClick={() => sendCommand(commandText)}
                 disabled={!commandText.trim()}
+                onClick={() => {
+                  if (commandText.trim()) {
+                    sendCommand(commandText);
+                  }
+                }}
                 title="Send Command"
               >
                 <Send size={15} />
@@ -314,15 +315,20 @@ export default function App() {
             </div>
           </section>
         </main>
-
-        {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
       </div>
+
+      {/* Landing Page Feedback Modal */}
+      <FeedbackModal 
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
 
       {/* Global Curiosity Orb & Dashboard Modal */}
       {isNexusHubActive && !isCuriosityDashboardOpen && (
         <CuriosityOrb 
           hooks={curiosityHooks} 
           onOpenDashboard={() => setIsCuriosityDashboardOpen(true)}
+          onLaunchCuriosity={handleLaunchCuriosity}
           onSelectHook={handleLaunchCuriosity}
         />
       )}
@@ -331,6 +337,7 @@ export default function App() {
         <CuriosityDashboard
           hooks={curiosityHooks}
           onClose={() => setIsCuriosityDashboardOpen(false)}
+          onLaunchCuriosity={handleLaunchCuriosity}
           onSelectHook={handleLaunchCuriosity}
         />
       )}
@@ -342,6 +349,8 @@ export default function App() {
         onLaunchMode={handleLaunchMode}
         onLaunchCuriosity={handleLaunchCuriosity}
         curiosityHooks={curiosityHooks}
+        onOpenCuriosityDashboard={() => setIsCuriosityDashboardOpen(true)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
       />
 
       {/* Full-Screen Workspaces */}

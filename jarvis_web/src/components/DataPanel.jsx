@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Plot from 'react-plotly.js';
 import { Cpu, Activity, Zap, Database, Radio, Globe, Shield, Sparkles, Orbit, Maximize2, Minimize2 } from 'lucide-react';
 import { API_URL } from '../config';
@@ -13,6 +14,16 @@ const resolveSimulationUrl = (url) => {
 
 const DataPanel = ({ data, status = 'sleeping' }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Handle fully self-contained HTML rendering (Physics Simulations)
   if (data && data.type === 'html_view' && data.html_url) {
@@ -29,6 +40,7 @@ const DataPanel = ({ data, status = 'sleeping' }) => {
                 LIVE
               </span>
               <button
+                type="button"
                 onClick={() => setIsFullscreen(true)}
                 title="Fullscreen Simulation"
                 style={{
@@ -59,30 +71,37 @@ const DataPanel = ({ data, status = 'sleeping' }) => {
           </div>
         </div>
 
-        {/* Fullscreen Overlay Lightbox */}
-        {isFullscreen && (
+        {/* Fullscreen Overlay Lightbox rendered directly to document.body via Portal */}
+        {isFullscreen && createPortal(
           <div style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 10005,
-            background: 'rgba(3, 5, 8, 0.95)',
-            backdropFilter: 'blur(20px)',
+            width: '100vw',
+            height: '100vh',
+            height: '100dvh',
+            zIndex: 999999,
+            background: '#030508',
             display: 'flex',
             flexDirection: 'column',
-            padding: '20px'
+            padding: '16px',
+            boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Orbit size={20} color="var(--cyan, #6ef6f7)" />
-                <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#fff', fontSize: '1.25rem', margin: 0 }}>
+                <h2 style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#fff', fontSize: '1.2rem', margin: 0 }}>
                   Interactive Physics Engine Simulation
                 </h2>
+                <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px', color: '#8e9bb9', marginLeft: '10px' }}>
+                  Press ESC or click button to exit
+                </span>
               </div>
               <button
+                type="button"
                 onClick={() => setIsFullscreen(false)}
                 style={{
                   background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
                   color: '#fff',
                   borderRadius: '8px',
                   padding: '8px 16px',
@@ -90,8 +109,9 @@ const DataPanel = ({ data, status = 'sleeping' }) => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  fontFamily: 'DM Mono',
-                  fontSize: '12px'
+                  fontFamily: 'DM Mono, monospace',
+                  fontSize: '12px',
+                  transition: 'all 0.2s'
                 }}
               >
                 <Minimize2 size={14} /> Exit Fullscreen
@@ -99,10 +119,12 @@ const DataPanel = ({ data, status = 'sleeping' }) => {
             </div>
             <iframe 
               src={safeSimulationUrl} 
-              style={{ width: '100%', height: '100%', flex: 1, border: '1px solid rgba(110, 246, 247, 0.3)', borderRadius: '16px', background: '#030508' }}
+              style={{ width: '100%', height: '100%', flex: 1, border: '1px solid rgba(110, 246, 247, 0.3)', borderRadius: '12px', background: '#030508' }}
               title="Fullscreen Physics Simulation"
+              allowFullScreen
             />
-          </div>
+          </div>,
+          document.body
         )}
       </>
     );

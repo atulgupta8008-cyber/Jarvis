@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import NexusLanding from './NexusLanding';
 
-export default function NexusHubModal({ isActive, isOpen, onLaunchMode, curiosityHooks, onLaunchCuriosity, onOpenCuriosityDashboard }) {
+export default function NexusHubModal({ isActive, isOpen, onLaunchMode, curiosityHooks, onLaunchCuriosity, onOpenCuriosityDashboard, onOpenFeedback }) {
   const visible = isActive !== undefined ? isActive : (isOpen !== undefined ? isOpen : true);
 
   if (!visible) return null;
@@ -29,6 +29,7 @@ export default function NexusHubModal({ isActive, isOpen, onLaunchMode, curiosit
         curiosityHooks={curiosityHooks}
         onLaunchCuriosity={onLaunchCuriosity}
         onOpenCuriosityDashboard={onOpenCuriosityDashboard}
+        onOpenFeedback={onOpenFeedback}
       />
     </motion.div>
   );
