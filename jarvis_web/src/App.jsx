@@ -28,6 +28,61 @@ const DEFAULT_CURIOSITY_HOOKS = [
   { question: "What happens if you travel at the speed of light and turn on a flashlight?", category: "Relativity", difficulty: 2, hook_type: "whatif" }
 ];
 
+// URL Router mapping helpers
+const getModeFromPath = (pathname, search = window.location.search) => {
+  const path = (pathname || window.location.pathname).toLowerCase().replace(/\/+$/, '') || '/';
+  const urlParams = new URLSearchParams(search);
+  const qParam = urlParams.get('q') || urlParams.get('question');
+  
+  if (path === '/professor' || path === '/teacher' || path === '/socratic') {
+    return { mode: 'professor', question: qParam };
+  }
+  if (path === '/architect' || path === '/systems') {
+    return { mode: 'architect', question: qParam };
+  }
+  if (path === '/assistant' || path === '/jarvis' || path === '/voice') {
+    return { mode: 'assistant', question: qParam };
+  }
+  if (path === '/study-group' || path === '/study' || path === '/debates') {
+    return { mode: 'study-group', question: qParam };
+  }
+  if (path === '/sandbox' || path === '/workspace') {
+    return { mode: 'sandbox', question: qParam };
+  }
+  if (path === '/curiosity' || path === '/curiosity-feed') {
+    return { mode: 'curiosity', question: qParam };
+  }
+  return { mode: 'nexus', question: qParam };
+};
+
+const getPathFromMode = (mode, question) => {
+  let path = '/';
+  if (mode === 'professor') path = '/professor';
+  else if (mode === 'architect') path = '/architect';
+  else if (mode === 'assistant' || mode === 'jarvis') path = '/jarvis';
+  else if (mode === 'study-group') path = '/study-group';
+  else if (mode === 'sandbox') path = '/sandbox';
+  else if (mode === 'curiosity') path = '/curiosity';
+  
+  if (question && mode === 'professor') {
+    path += `?q=${encodeURIComponent(question)}`;
+  }
+  return path;
+};
+
+const getTitleFromMode = (mode) => {
+  switch (mode) {
+    case 'professor': return 'Professor Mode — Socratic AI Tutor | Jarvis';
+    case 'architect': return 'Architect Mode — Systems Thinking | Jarvis';
+    case 'assistant':
+    case 'jarvis': return 'Jarvis AI — Voice & Intelligence Workspace';
+    case 'study-group': return 'Study Group — Collaborative AI Debate | Jarvis';
+    case 'sandbox': return 'Sandbox Workspace | Jarvis';
+    case 'curiosity': return 'Curiosity Feed | Jarvis';
+    default: return 'Jarvis AI — Personal Intelligence Platform';
+  }
+};
+
 export default function App() {
   const [state, setState] = useState({
     status: 'sleeping',
@@ -48,6 +103,41 @@ export default function App() {
   const [isCuriosityDashboardOpen, setIsCuriosityDashboardOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('chat'); // 'chat' | 'telemetry'
   const ws = useRef(null);
+
+  const applyRoute = (mode, question = null, pushState = true) => {
+    setIsNexusHubActive(mode === 'nexus');
+    setIsProfessorModeActive(mode === 'professor');
+    setIsStudyGroupModeActive(mode === 'study-group');
+    setIsArchitectModeActive(mode === 'architect');
+    setIsSandboxModeActive(mode === 'sandbox');
+    setIsCuriosityDashboardOpen(mode === 'curiosity');
+    if (question !== undefined) {
+      setCuriosityQuestion(question);
+    }
+    document.title = getTitleFromMode(mode);
+
+    if (pushState) {
+      const targetUrl = getPathFromMode(mode, question);
+      const currentUrl = window.location.pathname + window.location.search;
+      if (currentUrl !== targetUrl) {
+        window.history.pushState({ mode, question }, '', targetUrl);
+      }
+    }
+  };
+
+  // Synchronize URL on initial load and handle browser Back/Forward (popstate)
+  useEffect(() => {
+    const route = getModeFromPath(window.location.pathname, window.location.search);
+    applyRoute(route.mode, route.question, false);
+
+    const onPopState = () => {
+      const currentRoute = getModeFromPath(window.location.pathname, window.location.search);
+      applyRoute(currentRoute.mode, currentRoute.question, false);
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -119,39 +209,23 @@ export default function App() {
   }, []);
 
   const handleLaunchMode = (mode) => {
-    setIsNexusHubActive(false);
-    setIsProfessorModeActive(false);
-    setIsStudyGroupModeActive(false);
-    setIsArchitectModeActive(false);
-    setIsSandboxModeActive(false);
-
-    if (mode === 'professor' || mode === 'teacher') {
-      setIsProfessorModeActive(true);
-    } else if (mode === 'study-group' || mode === 'debates') {
-      setIsStudyGroupModeActive(true);
-    } else if (mode === 'architect' || mode === 'curiosity') {
-      setIsArchitectModeActive(true);
-    } else if (mode === 'sandbox') {
-      setIsSandboxModeActive(true);
-    } else if (mode === 'assistant') {
-      // All mode flags are already false — the assistant HUD becomes visible
-    }
+    applyRoute(mode, null, true);
   };
 
   const handleLaunchCuriosity = (question) => {
-    setIsNexusHubActive(false);
-    setIsProfessorModeActive(true);
-    setCuriosityQuestion(question);
-    setIsCuriosityDashboardOpen(false);
+    applyRoute('professor', question, true);
   };
 
   const handleReturnToNexus = () => {
-    setIsProfessorModeActive(false);
-    setIsStudyGroupModeActive(false);
-    setIsArchitectModeActive(false);
-    setIsSandboxModeActive(false);
-    setCuriosityQuestion(null);
-    setIsNexusHubActive(true);
+    applyRoute('nexus', null, true);
+  };
+
+  const handleOpenCuriosity = () => {
+    applyRoute('curiosity', null, true);
+  };
+
+  const handleCloseCuriosity = () => {
+    applyRoute('nexus', null, true);
   };
 
   // Audio Context for synthetic beeps
@@ -324,7 +398,7 @@ export default function App() {
       {isNexusHubActive && !isCuriosityDashboardOpen && (
         <CuriosityOrb 
           hooks={curiosityHooks} 
-          onOpenDashboard={() => setIsCuriosityDashboardOpen(true)}
+          onOpenDashboard={handleOpenCuriosity}
           onLaunchCuriosity={handleLaunchCuriosity}
           onSelectHook={handleLaunchCuriosity}
         />
@@ -333,7 +407,7 @@ export default function App() {
       {isCuriosityDashboardOpen && (
         <CuriosityDashboard
           hooks={curiosityHooks}
-          onClose={() => setIsCuriosityDashboardOpen(false)}
+          onClose={handleCloseCuriosity}
           onLaunchCuriosity={handleLaunchCuriosity}
           onSelectHook={handleLaunchCuriosity}
         />
@@ -346,7 +420,7 @@ export default function App() {
         onLaunchMode={handleLaunchMode}
         onLaunchCuriosity={handleLaunchCuriosity}
         curiosityHooks={curiosityHooks}
-        onOpenCuriosityDashboard={() => setIsCuriosityDashboardOpen(true)}
+        onOpenCuriosityDashboard={handleOpenCuriosity}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
       />
 

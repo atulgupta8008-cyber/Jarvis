@@ -446,7 +446,7 @@
 
 .scroll-hint {
   position: absolute;
-  bottom: 32px;
+  bottom: 150px;
   left: clamp(24px, 4vw, 48px);
   font-family: 'DM Mono', monospace;
   font-size: 10px;

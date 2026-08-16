@@ -127,7 +127,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
       <nav className="nexus-nav">
         <div className="nav-logo" onClick={() => jump('top')} style={{ cursor: 'pointer' }}>
           <span className="logo-hex"><Sparkles size={14} /></span>
-          JARVIS<span style={{ color: 'var(--cyan)' }}>//</span>OS
+          NOVANETS<span style={{ color: 'var(--cyan)' }}>//</span>OS
         </div>
         <div className="nav-links">
           <button className="nav-link" onClick={() => jump('mission')}>Mission</button>
@@ -433,7 +433,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
         <div className="footer-left">
           <div className="nav-logo" style={{ opacity: 0.5, fontSize: 11 }}>
             <span className="logo-hex" style={{ width: 20, height: 20, filter: 'grayscale(0.5)' }}><Sparkles size={10} /></span>
-            JARVIS//OS
+            NOVANETS//OS
           </div>
           <span>Personal intelligence for purposeful work.</span>
         </div>
