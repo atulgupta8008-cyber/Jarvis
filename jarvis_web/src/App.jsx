@@ -194,23 +194,19 @@ export default function App() {
     }
   };
 
+  const isAssistantActive = !isNexusHubActive && !isProfessorModeActive && !isStudyGroupModeActive && !isArchitectModeActive && !isSandboxModeActive;
+
   return (
     <>
       {/* =========================================================================
           JARVIS AI ASSISTANT HUD (TELEMETRY + QUANTUM SIMULATION & COMPLETE CHAT)
           ========================================================================= */}
-      <div 
-        className="hud-container assistant-stage-layout" 
-        style={{ 
-          opacity: isNexusHubActive ? 0 : 1, 
-          pointerEvents: isNexusHubActive ? 'none' : 'auto', 
-          transition: 'opacity 0.3s ease' 
-        }}
-      >
-        <BackgroundFX status={state.status} />
-        
-        {/* Top Header Bar */}
-        <header className="assistant-header-bar">
+      {isAssistantActive && (
+        <div className="hud-container assistant-stage-layout">
+          <BackgroundFX status={state.status} />
+          
+          {/* Top Header Bar */}
+          <header className="assistant-header-bar">
           <div className="assistant-header-left">
             <button 
               className="hud-nexus-return-btn"
@@ -316,6 +312,7 @@ export default function App() {
           </section>
         </main>
       </div>
+      )}
 
       {/* Landing Page Feedback Modal */}
       <FeedbackModal 

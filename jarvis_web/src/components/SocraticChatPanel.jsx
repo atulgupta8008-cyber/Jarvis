@@ -105,8 +105,8 @@ export default function SocraticChatPanel({
         </div>
       )}
 
-      {/* Shrinkable Chat Stream Area */}
-      <div className="socratic-chat-scroll-area" style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', marginBottom: '8px', position: 'relative', paddingRight: '4px' }}>
+      {/* Shrinkable Chat Stream Area (Single clean scroll container via ChatPanel) */}
+      <div className="socratic-chat-scroll-area" style={{ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginBottom: '6px', position: 'relative' }}>
         {isEpiphanyMode && currentAct > 0 && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '12px',
