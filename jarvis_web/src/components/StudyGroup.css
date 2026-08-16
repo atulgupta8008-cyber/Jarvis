@@ -400,7 +400,15 @@
 
 @media (max-width: 990px) {
   .study-group-workspace-root {
-    padding: 6px !important;
+    padding: max(4px, env(safe-area-inset-top, 4px)) 6px max(14px, calc(env(safe-area-inset-bottom, 0px) + 12px)) 6px !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    height: 100svh !important;
+    max-height: 100dvh !important;
+    position: fixed !important;
+    inset: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
   .study-group-header {
