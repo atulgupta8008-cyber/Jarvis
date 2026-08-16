@@ -1,7 +1,15 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles, Atom, Network, FolderLock, Plus } from 'lucide-react';
 import ChatPanel from './ChatPanel'; 
+
+const THOUGHT_STAGES = [
+  "Accessing knowledge graph...",
+  "Synthesizing response vectors...",
+  "Formulating Socratic explanation...",
+  "Structuring conceptual derivation..."
+];
 
 export default function SocraticChatPanel({ 
   history, 
@@ -17,6 +25,18 @@ export default function SocraticChatPanel({
   const [isDeepResearch, setIsDeepResearch] = useState(false);
   const [isEpiphanyMode, setIsEpiphanyMode] = useState(false);
   const [isColliderMode, setIsColliderMode] = useState(false);
+  const [thoughtIndex, setThoughtIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isThinking) {
+      setThoughtIndex(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setThoughtIndex((prev) => (prev + 1) % THOUGHT_STAGES.length);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [isThinking]);
 
   const onDrop = useCallback(acceptedFiles => {
     acceptedFiles.forEach(file => {
@@ -115,19 +135,33 @@ export default function SocraticChatPanel({
         {isThinking && (
           <div style={{
             display: 'flex', flexDirection: 'column', padding: '12px 16px', marginTop: '12px',
-            background: 'linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 100%)', 
-            borderLeft: '2px solid rgba(255,255,255,0.2)', borderRadius: '0 8px 8px 0',
+            background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 0%, transparent 100%)', 
+            borderLeft: '2px solid var(--cyan, #6ef6f7)', borderRadius: '0 8px 8px 0',
             color: '#8e9bb9', fontSize: '0.85rem', fontFamily: 'Space Grotesk, sans-serif',
             overflow: 'hidden', position: 'relative'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', fontWeight: 500 }}>
-              <div className="pulse-dot" style={{ background: '#8e9bb9' }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontWeight: 600, color: '#f4f7ff' }}>
+              <div className="pulse-dot" style={{ background: 'var(--cyan, #6ef6f7)' }}></div>
               <span>Processing</span>
             </div>
-            <div className="thought-stream" style={{ fontSize: '0.75rem', color: '#4a5568' }}>
-              <div className="thought-text">Accessing knowledge graph...</div>
-              <div className="thought-text">Synthesizing response vectors...</div>
-              <div className="thought-text">Formulating explanation...</div>
+            <div style={{ height: '18px', position: 'relative', overflow: 'hidden' }}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={thoughtIndex}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--forge-muted, #8e9bb9)',
+                    fontFamily: 'DM Mono, monospace',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {THOUGHT_STAGES[thoughtIndex]}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
         )}

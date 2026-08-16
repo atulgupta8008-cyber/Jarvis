@@ -55,8 +55,13 @@ export default function ArchitectMode({ onExit }) {
         
         // INTERCEPTOR LOGIC
         if (data.type === 'professor_chat') {
-          setChatHistory(prev => [...prev, { role: data.role, message: data.message, teaching_score: data.teaching_score }]);
+          setResearchStatus('');
+          const act = data.message.match(/\[ACT:(\d)\]/);
+          if (act) setCurrentAct(Number(act[1]));
+          const message = data.message.replace(/\[ACT:\d\]/g, '').trim();
+          setChatHistory(prev => [...prev.filter(item => !item.isStreaming), { role: data.role, message, teaching_score: data.teaching_score }]);
         } else if (data.type === 'professor_history_loaded') {
+          setResearchStatus('');
           if (data.history) {
             setChatHistory(data.history.map(msg => ({ role: msg.role === 'young_jarvis' ? 'young_jarvis' : 'user', message: msg.content })));
           }
@@ -64,6 +69,7 @@ export default function ArchitectMode({ onExit }) {
           setSessions(data.sessions || []);
         } else if (data.type === 'professor_session_created') {
           setActiveSessionId(data.session_id);
+          setResearchStatus('');
           setChatHistory([]);
           setBlackboardWidgets([]);
         } else if (data.type === 'blackboard_widget') {
@@ -81,8 +87,14 @@ export default function ArchitectMode({ onExit }) {
           }));
         } else if (data.type === 'research_status') {
           setResearchStatus(data.status);
-          if (data.status.includes('Complete')) {
-            setTimeout(() => setResearchStatus(''), 3000);
+          if (data.status && (
+            data.status.toLowerCase().includes('complete') || 
+            data.status.toLowerCase().includes('finish') || 
+            data.status.toLowerCase().includes('done') || 
+            data.status.toLowerCase().includes('whiteboard') ||
+            data.status.toLowerCase().includes('rendering')
+          )) {
+            setTimeout(() => setResearchStatus(''), 3500);
           }
         } else if (data.type === 'professor_thinking') {
           setIsThinking(data.is_thinking);
@@ -104,6 +116,7 @@ export default function ArchitectMode({ onExit }) {
 
   const handleSendMessage = (payload) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN && activeSessionId) {
+      setResearchStatus('');
       ws.current.send(JSON.stringify({ 
         type: 'professor_query', 
         text: payload.text,
@@ -117,6 +130,7 @@ export default function ArchitectMode({ onExit }) {
   };
 
   const handleNewSession = () => {
+    setResearchStatus('');
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'architect' }));
     }
@@ -124,6 +138,7 @@ export default function ArchitectMode({ onExit }) {
 
   const handleSelectSession = (id) => {
     setActiveSessionId(id);
+    setResearchStatus('');
     setBlackboardWidgets([]); // Clear blackboard for new topic
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ type: 'professor_load_history', session_id: id, mode: 'architect' }));
@@ -136,6 +151,7 @@ export default function ArchitectMode({ onExit }) {
       ws.current.send(JSON.stringify({ type: 'professor_delete_session', session_id: id, mode: 'architect' }));
       if (activeSessionId === id) {
         setActiveSessionId(null);
+        setResearchStatus('');
         setChatHistory([]);
         setBlackboardWidgets([]);
       }

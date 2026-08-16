@@ -24,12 +24,12 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
   return (
     <div style={{
       position: 'fixed',
-      bottom: '40px',
-      right: '40px',
+      bottom: '10px',
+      right: '10px',
       zIndex: 10000,
       display: 'flex',
       alignItems: 'center',
-      gap: '15px'
+      gap: '10px'
     }}>
       <AnimatePresence>
         {activeHook && (
@@ -37,7 +37,7 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
             initial={{ opacity: 0, x: 20, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 10, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            transition={{ type: "spring", stiffness: 150, damping: 25 }}
             onClick={() => {
               onLaunchCuriosity(activeHook.question);
               setActiveHook(null);
@@ -45,9 +45,9 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
             style={{
               background: 'rgba(3, 7, 18, 0.8)',
               backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(157, 78, 221, 0.5)',
-              borderRadius: '20px',
-              padding: '12px 20px',
+              border: '0.5px solid rgba(157, 78, 221, 0.5)',
+              borderRadius: '30px',
+              padding: '8px 15px',
               color: '#fff',
               maxWidth: '300px',
               cursor: 'pointer',
@@ -55,10 +55,10 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
               fontFamily: 'Orbitron, sans-serif'
             }}
           >
-            <div style={{ fontSize: '0.9rem', lineHeight: '1.4' }}>
+            <div style={{ fontSize: '0.7rem', lineHeight: '1.4' }}>
               {activeHook.question}
             </div>
-            <div style={{ fontSize: '0.7rem', color: '#9d4edd', marginTop: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            <div style={{ fontSize: '0.7rem', color: '#9d4edd', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>
               {activeHook.category}
             </div>
           </motion.div>
@@ -78,8 +78,8 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
         style={{
-          width: '60px',
-          height: '60px',
+          width: '45px',
+          height: '45px',
           borderRadius: '50%',
           background: 'linear-gradient(135deg, #4c1d95, #7e22ce)',
           border: 'none',
@@ -90,7 +90,7 @@ export default function CuriosityOrb({ hooks, onLaunchCuriosity, onOpenDashboard
           color: 'white'
         }}
       >
-        <Sparkles size={28} />
+        <Sparkles size={25} />
       </motion.button>
     </div>
   );

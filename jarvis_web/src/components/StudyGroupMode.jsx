@@ -58,12 +58,14 @@ export default function StudyGroupMode({ onExit }) {
             return newHistory;
           });
         } else if (data.type === 'professor_chat') {
+          setResearchStatus('');
           setChatHistory(prev => {
             const filtered = prev.filter(msg => !msg.isStreaming);
             return [...filtered, { role: data.role, message: data.message }];
           });
         } else if (data.type === 'professor_session_created') {
           setActiveSessionId(data.session_id);
+          setResearchStatus('');
           setChatHistory([]);
           setBlackboardWidgets([]);
         } else if (data.type === 'blackboard_widget') {
@@ -82,8 +84,14 @@ export default function StudyGroupMode({ onExit }) {
           }));
         } else if (data.type === 'research_status') {
           setResearchStatus(data.status);
-          if (data.status.includes('Complete')) {
-            setTimeout(() => setResearchStatus(''), 3000);
+          if (data.status && (
+            data.status.toLowerCase().includes('complete') || 
+            data.status.toLowerCase().includes('finish') || 
+            data.status.toLowerCase().includes('done') || 
+            data.status.toLowerCase().includes('whiteboard') ||
+            data.status.toLowerCase().includes('rendering')
+          )) {
+            setTimeout(() => setResearchStatus(''), 3500);
           }
         } else if (data.type === 'professor_thinking') {
           setIsThinking(data.is_thinking);
@@ -105,6 +113,7 @@ export default function StudyGroupMode({ onExit }) {
   const handleSendMessage = () => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN && activeSessionId) {
       if (!inputText.trim() && attachedFiles.length === 0) return;
+      setResearchStatus('');
 
       ws.current.send(JSON.stringify({ 
         type: 'professor_query', 

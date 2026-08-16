@@ -58,11 +58,13 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
             return next;
           });
         } else if (data.type === 'professor_chat') {
+          setResearchStatus('');
           const act = data.message.match(/\[ACT:(\d)\]/);
           if (act) setCurrentAct(Number(act[1]));
           const message = data.message.replace(/\[ACT:\d\]/g, '').trim();
           setChatHistory((history) => [...history.filter((item) => !item.isStreaming), { role: data.role, message }]);
         } else if (data.type === 'professor_history_loaded' && data.history) {
+          setResearchStatus('');
           setChatHistory(data.history.map((item) => ({ role: item.role === 'jarvis' ? 'jarvis' : 'user', message: item.content })));
         } else if (data.type === 'professor_sessions_loaded') {
           setSessions(data.sessions || []);
@@ -70,6 +72,7 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
           setSessionMedia(data.media || []);
         } else if (data.type === 'professor_session_created') {
           setActiveSessionId(data.session_id);
+          setResearchStatus('');
           setChatHistory([]);
           setBlackboardWidgets([]);
           setSessionMedia([]);
@@ -100,6 +103,15 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
           }));
         } else if (data.type === 'research_status') {
           setResearchStatus(data.status);
+          if (data.status && (
+            data.status.toLowerCase().includes('complete') || 
+            data.status.toLowerCase().includes('finish') || 
+            data.status.toLowerCase().includes('done') || 
+            data.status.toLowerCase().includes('whiteboard') ||
+            data.status.toLowerCase().includes('rendering')
+          )) {
+            setTimeout(() => setResearchStatus(''), 3500);
+          }
         } else if (data.type === 'professor_thinking') {
           setIsThinking(data.is_thinking);
         }
@@ -115,11 +127,13 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
 
   const send = (payload) => {
     if (ws.current?.readyState !== WebSocket.OPEN || !activeSessionId) return;
+    setResearchStatus('');
     ws.current.send(JSON.stringify({ type: 'professor_query', session_id: activeSessionId, ...payload }));
     setChatHistory((history) => [...history, { role: 'user', message: payload.text || '[File attached]' }]);
   };
 
   const createSession = () => {
+    setResearchStatus('');
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'professor' }));
     }
@@ -127,6 +141,7 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
 
   const selectSession = (id) => {
     setActiveSessionId(id);
+    setResearchStatus('');
     setBlackboardWidgets([]);
     setSessionMedia([]);
     setIsSessionsOpen(false);
@@ -312,11 +327,39 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
             onUploadMedia={handleUploadMedia}
             mediaCount={sessionMedia.length}
           />
-          {researchStatus && (
-            <div className="workspace-research-status">
-              {researchStatus}
-            </div>
-          )}
+          <AnimatePresence>
+            {researchStatus && (
+              <motion.div 
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="workspace-research-status"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span className="pulse-dot" style={{ background: 'var(--forge-cyan, #6ef6f7)', width: '6px', height: '6px', flexShrink: 0 }} />
+                  <span>{researchStatus}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResearchStatus('')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--forge-muted, #8e9bb9)',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexShrink: 0
+                  }}
+                  title="Dismiss status"
+                >
+                  <X size={13} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className={`workspace-board ${mobilePane === 'board' ? 'is-mobile-active' : ''}`}>
