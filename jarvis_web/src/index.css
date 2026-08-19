@@ -1530,3 +1530,59 @@ body {
   .assistant-orb-container { width: 36px !important; height: 36px !important; }
   .assistant-terminal-bar { padding: 4px 10px !important; margin-top: 2px !important; }
 }
+
+/* =========================================================================
+   KATEX & MATHEMATICAL TYPOGRAPHY STYLING
+   ========================================================================= */
+
+.katex-mathml {
+  display: none !important; /* Strictly avoid duplicate MathML rendering */
+}
+
+.katex {
+  font-size: 1.05em !important;
+  color: #f4f7ff !important;
+  line-height: 1.2 !important;
+  text-rendering: auto !important;
+}
+
+.katex-inline {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  padding: 0 2px !important;
+}
+
+.katex-display-wrapper {
+  margin: 12px 0 !important;
+  padding: 10px 16px !important;
+  background: rgba(3, 5, 8, 0.7) !important;
+  border: 1px solid rgba(110, 246, 247, 0.2) !important;
+  border-radius: 8px !important;
+  overflow-x: auto !important;
+  text-align: center !important;
+}
+
+.katex-display-wrapper .katex-display {
+  margin: 0 !important;
+  padding: 4px 0 !important;
+}
+
+.formatted-message-body p {
+  margin: 6px 0 !important;
+  line-height: 1.65 !important;
+}
+
+.formatted-message-body strong {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.formatted-message-body em {
+  color: #d1d8e6 !important;
+}
+
+.formatted-message-body ul, .formatted-message-body ol {
+  margin: 6px 0 6px 16px !important;
+  padding: 0 !important;
+}
+
