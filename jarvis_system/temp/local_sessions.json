@@ -1,6 +1,60 @@
 {
   "sessions": [
+    {
+      "id": "486805a2-6185-40e4-9315-630433c9a3d8",
+      "session_title": "Greeting inquiry",
+      "mode": "professor",
+      "user_id": "guest_local",
+      "created_at": "2026-08-19T16:11:32Z"
+    },
+    {
+      "id": "1c6f345a-a65e-442c-ab0d-f22c1d1e1097",
+      "session_title": "Greeting and introduction",
+      "mode": "professor",
+      "user_id": "guest_local",
+      "created_at": "2026-08-19T16:08:00Z"
+    }
   ],
   "messages": {
+    "1c6f345a-a65e-442c-ab0d-f22c1d1e1097": [
+      {
+        "id": "e12d6141-ad23-4749-a307-6fba8d2d9b35",
+        "session_id": "1c6f345a-a65e-442c-ab0d-f22c1d1e1097",
+        "role": "user",
+        "content": "hi",
+        "user_id": "guest_local",
+        "teaching_score": null,
+        "created_at": "2026-08-19T16:10:02Z"
+      },
+      {
+        "id": "46815f17-9bfd-4396-ba21-9512aa5255fc",
+        "session_id": "1c6f345a-a65e-442c-ab0d-f22c1d1e1097",
+        "role": "jarvis",
+        "content": "Welcome, Guest Scholar. It is a pleasure to have you in the laboratory. \n\nIn this space, we do not merely memorize the consensus of the literature; we interrogate the fundamental principles that govern our universe. Whether you wish to explore the geometric curvature of spacetime, the statistical mechanics of non-equilibrium systems, or the intricacies of quantum field theory, we shall proceed by dismantling the problem into its constituent axioms.\n\nTo begin, tell me: what specific problem or phenomenon is currently occupying your curiosity? What is the physical intuition you have formed thus far, and where do you find the current derivation or explanation lacking?",
+        "user_id": "guest_local",
+        "teaching_score": null,
+        "created_at": "2026-08-19T16:10:03Z"
+      }
+    ],
+    "486805a2-6185-40e4-9315-630433c9a3d8": [
+      {
+        "id": "1faa03f7-96b5-46bf-815e-9df0e8e5ce63",
+        "session_id": "486805a2-6185-40e4-9315-630433c9a3d8",
+        "role": "user",
+        "content": "hi",
+        "user_id": "guest_local",
+        "teaching_score": null,
+        "created_at": "2026-08-19T16:11:39Z"
+      },
+      {
+        "id": "1816f9a5-5588-4c7d-a09d-2f9d4d172c49",
+        "session_id": "486805a2-6185-40e4-9315-630433c9a3d8",
+        "role": "jarvis",
+        "content": "Welcome, Guest Scholar. It is a pleasure to meet a mind ready to engage with the rigors of fundamental inquiry. \n\nIn my lecture hall, we do not merely memorize the \"what\"\u2014the laws, the constants, the solutions\u2014but we obsess over the \"why.\" We strip away the layers of abstraction until we are left with the irreducible physical and mathematical truths that govern our universe.\n\nBefore we proceed, tell me: what branch of the physical sciences or mathematical structures is currently occupying your thoughts? Are we to examine the curvature of spacetime, the behavior of quantum states, or perhaps the analytical mechanics underlying a complex dynamical system? \n\nWhere shall we begin our derivation?",
+        "user_id": "guest_local",
+        "teaching_score": null,
+        "created_at": "2026-08-19T16:11:39Z"
+      }
+    ]
   }
 }
