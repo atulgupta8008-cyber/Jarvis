@@ -4,6 +4,7 @@ import { LogOut, Send, File as FileIcon, Users, ShieldAlert, Sparkles, MessageSq
 import { useDropzone } from 'react-dropzone';
 import ChatPanel from './ChatPanel';
 import Blackboard from './Blackboard';
+import { useAuth } from '../context/AuthContext';
 import { WS_URL } from '../config';
 import './StudyGroup.css';
 
@@ -22,6 +23,7 @@ function setNodeLoading(node, targetId, variable) {
 }
 
 export default function StudyGroupMode({ onExit }) {
+  const { user, profile, isAdmin } = useAuth();
   const [chatHistory, setChatHistory] = useState([]);
   const [blackboardWidgets, setBlackboardWidgets] = useState([]);
   const [researchStatus, setResearchStatus] = useState('');
@@ -30,20 +32,39 @@ export default function StudyGroupMode({ onExit }) {
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [targetAgent, setTargetAgent] = useState('all');
-  const [mobileTab, setMobileTab] = useState('chat'); // EXACTLY 2 TABS: 'chat' | 'board'
+  const [mobileTab, setMobileTab] = useState('chat');
   const ws = useRef(null);
+
+  const myUserId = user?.id || (isAdmin ? 'admin_master' : 'guest_local');
+
+  // Clear history on user account switch
+  useEffect(() => {
+    setActiveSessionId(null);
+    setChatHistory([]);
+    setBlackboardWidgets([]);
+  }, [myUserId]);
 
   useEffect(() => {
     ws.current = new WebSocket(WS_URL);
     
     ws.current.onopen = () => {
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'study_group' }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_create_session', 
+        mode: 'study_group',
+        user_id: myUserId,
+        role: isAdmin ? 'admin' : 'user'
+      }));
       ws.current.send(JSON.stringify({ type: 'system_command', action: 'pause_voice_agent' }));
     };
 
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Strict ownership check: reject any message tagged for a different account
+        const isMyMessage = !data.user_id || data.user_id === myUserId;
+        if (!isMyMessage) return;
+
         if (data.type === 'professor_stream_chunk') {
           setChatHistory(prev => {
             const newHistory = [...prev];
@@ -64,10 +85,12 @@ export default function StudyGroupMode({ onExit }) {
             return [...filtered, { role: data.role, message: data.message }];
           });
         } else if (data.type === 'professor_session_created') {
-          setActiveSessionId(data.session_id);
-          setResearchStatus('');
-          setChatHistory([]);
-          setBlackboardWidgets([]);
+          if (data.mode === 'study_group') {
+            setActiveSessionId(data.session_id);
+            setResearchStatus('');
+            setChatHistory([]);
+            setBlackboardWidgets([]);
+          }
         } else if (data.type === 'blackboard_widget') {
           setBlackboardWidgets(prev => [...prev, {
             id: data.id,
@@ -108,7 +131,7 @@ export default function StudyGroupMode({ onExit }) {
         ws.current.close(); 
       }
     };
-  }, []);
+  }, [myUserId]);
 
   const handleSendMessage = () => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN && activeSessionId) {
@@ -122,7 +145,10 @@ export default function StudyGroupMode({ onExit }) {
         deep_research: false,
         is_study_group: true,
         target_agent: targetAgent,
-        session_id: activeSessionId 
+        session_id: activeSessionId,
+        user_id: myUserId,
+        role: isAdmin ? 'admin' : 'user',
+        user_profile: profile
       }));
       setChatHistory(prev => [...prev, { role: 'user', message: inputText || "[File Attached]" }]);
       setInputText('');

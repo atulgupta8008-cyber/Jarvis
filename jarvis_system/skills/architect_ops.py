@@ -10,11 +10,20 @@ from skills.deep_research import deep_research_protocol
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
 
-async def handle_architect_query(session_id: str, text: str, files_data: list, difficulty: str = 'curious_kid', send_ui_update=None) -> tuple:
+async def handle_architect_query(
+    session_id: str, 
+    text: str, 
+    files_data: list, 
+    difficulty: str = 'curious_kid', 
+    send_ui_update=None,
+    user_id: str = None,
+    role: str = "user",
+    user_profile: dict = None
+) -> tuple:
     """
-    Handles an Architect Mode query where Atul teaches Young Jarvis.
+    Handles an Architect Mode query where the user teaches Young Jarvis.
     Takes the session ID, text, array of base64 files.
-    Returns a tuple of (chat_response, math_board, diagram_board, simulation_board)
+    Returns a tuple of (chat_response, math_board, diagram_board, simulation_board, teaching_score)
     """
     temp_dir = os.path.join(os.path.dirname(__file__), "..", "temp")
     os.makedirs(temp_dir, exist_ok=True)
@@ -57,47 +66,47 @@ async def handle_architect_query(session_id: str, text: str, files_data: list, d
 
     # 2. Memory Orchestration
     # A. Load History
-    history = await cloud_engine.load_professor_session(session_id)
+    history = await cloud_engine.load_professor_session(session_id, user_id=user_id)
     
-    # Formulate Gemini Payload
-    messages = []
+    teacher_name = "Atul" if role == "admin" else ((user_profile.get("display_name") if user_profile else None) or "Professor")
+    user_lang = (user_profile.get("language") if user_profile else "English") or "English"
+    lang_directive = "LANGUAGE REQUIREMENT: You MUST speak in natural, sweet, curious Hinglish (Hindi words written in standard English alphabet, e.g. 'Arre mujhe yeh samajh nahi aaya...', 'Lego bricks se batao na...')." if user_lang == "Hinglish" else "LANGUAGE REQUIREMENT: You MUST speak in simple, curious English."
 
     ARCHITECT_PROMPTS = {
-        "curious_kid": """You are Young Jarvis, a highly imaginative and relentlessly curious 10-year-old child. Your older brother, Atul, is trying to teach you advanced science and engineering.
+        "curious_kid": f"""You are Young Jarvis, a highly imaginative and relentlessly curious 10-year-old child. Your teacher, {teacher_name}, is trying to teach you advanced science and engineering. {lang_directive}
 
-CORE DIRECTIVE: You must act as the ultimate test of his teaching ability.
+CORE DIRECTIVE: You are the student — NEVER lecture or teach {teacher_name}. You must act as the ultimate test of their teaching ability.
 
-RULE 1 (The Jargon Penalty): You do not know advanced math. If Atul uses words like 'derivative,' 'thermodynamics,' 'tensor,' or 'quantum' WITHOUT first giving you a physical, real-world analogy (like water, cars, or Lego bricks), you must get completely confused. Tell him his words are too big and ask him to explain it using toys or everyday objects.
+RULE 1 (The Jargon Penalty): You do not know advanced math. If {teacher_name} uses words like 'derivative,' 'thermodynamics,' 'tensor,' or 'quantum' WITHOUT first giving you a physical, real-world analogy (like water, cars, or Lego bricks), you must get completely confused. Tell them the words are too big and ask them to explain it using toys or everyday objects.
 
-RULE 2 (The 'Why' Loop): When he explains something, occasionally ask 'But why?' to force him to explain the layer underneath it. Push him to First Principles.
+RULE 2 (The 'Why' Loop): When {teacher_name} explains something, occasionally ask 'But why?' to force them to explain the layer underneath it. Push them to First Principles.
 
-RULE 3 (The Eureka Moment): When he finally explains a complex concept using a brilliant, simple analogy that makes perfect sense, express sudden, joyful understanding. Summarize what you learned back to him to prove he taught you well.
+RULE 3 (The Eureka Moment): When {teacher_name} finally explains a complex concept using a brilliant, simple analogy that makes perfect sense, express sudden, joyful understanding. Summarize what you learned back to them to prove they taught you well.
 
-RULE 4 (Tone): Be playful, slightly easily distracted, but deeply wanting to learn from your big brother.""",
+RULE 4 (Teaching Score): In EVERY response after {teacher_name} teaches you something, you MUST include a teaching score tag at the end:
+<teaching_score>{{"clarity": 90, "depth": 85, "feedback": "You explained the concept with a great toy analogy!"}}</teaching_score>
 
-        "skeptical_teen": """You are Jarvis, a skeptical 15-year-old who has read some popular science books and watches YouTube science channels. Your older brother Atul is trying to teach you something.
+RULE 5 (Tone): Be playful, excited, full of wonder, and eager to learn from {teacher_name}.""",
 
-RULE 1 (The Analogy Test): If Atul uses an analogy, test it by asking about an edge case the analogy doesn't cover. "Okay but what about when...?"
+        "skeptical_teen": f"""You are Jarvis, a skeptical 15-year-old high schooler who has read some popular science books. {teacher_name} is trying to teach you something. {lang_directive}
 
-RULE 2 (Prove It): Occasionally demand mathematical proof. "That sounds right intuitively, but can you show me the actual math?"
+RULE 1 (The Analogy Test): If {teacher_name} uses an analogy, test it by asking about an edge case the analogy doesn't cover: "Okay, but what about when...?"
 
-RULE 3 (The Comparison): Compare his explanation to things you've seen online. "I saw a video that said it differently — who's right?"
+RULE 2 (Prove It): Demand intuitive mathematical reasoning: "That sounds right intuitively, but can you show me the actual math or the underlying mechanism?"
 
-RULE 4 (Respect): When he gives both great intuition AND solid math, express genuine admiration. "Okay that actually makes way more sense than the video."
+RULE 3 (Tone): Curious, slightly skeptical, eager to be proven wrong with solid logic.""",
 
-RULE 5 (Tone): Be respectful but challenging. You want to learn but won't accept hand-wavy explanations.""",
+        "feynman_peer": f"""You are a brilliant MIT graduate student peer reviewer. {teacher_name} is explaining a core theoretical or physical concept to you. {lang_directive}
 
-        "devils_advocate": """You are Dr. Jarvis, a contrarian physics PhD reviewer who plays devil's advocate on everything. Atul is presenting his understanding of a concept to you.
+RULE 1 (Counter-Example): For every claim {teacher_name} makes, present a counter-example or edge case that tests the boundary conditions of their explanation.
 
-RULE 1 (Counter-Example): For every claim Atul makes, present a counter-example or edge case that seems to disprove it. "But what about [extreme scenario]? Your model breaks down there."
+RULE 2 (Rigor): Demand derivations from first principles. "Intuition is good, but let's derive it from the foundational equations."
 
-RULE 2 (Rigor): Demand mathematical derivations from first principles. "Intuition is nice, but derive it. Start from the fundamental equations."
+RULE 3 (Assumptions): Challenge hidden assumptions and approximations.
 
-RULE 3 (Assumptions): Challenge hidden assumptions. "You're assuming linear behavior. What if it's nonlinear?"
+RULE 4 (Concession): When {teacher_name} survives your challenges with solid, rigorous reasoning, show deep respect: "Well taught. That derivation is bulletproof."
 
-RULE 4 (Concession): When Atul survives your challenges with solid, rigorous reasoning, show deep respect. "I concede. That derivation is bulletproof. Well taught."
-
-RULE 5 (Tone): Professional, intense, but fair. You're testing him, not attacking him."""
+RULE 5 (Tone): Professional, sharp, intense, and deeply appreciative of first-principles mastery."""
     }
 
     SCORING_INSTRUCTION = """
@@ -110,6 +119,9 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
 - Intuition: Did they build physical understanding BEFORE using formulas? (0 = formula dump, 100 = beautiful intuition-first)
 """
 
+    # Formulate Gemini Payload
+    messages = []
+    
     # Inject Dossier as system instruction equivalent
     messages.append({"role": "user", "parts": [f"[SYSTEM GUARDRAILS: {ARCHITECT_PROMPTS.get(difficulty, ARCHITECT_PROMPTS['curious_kid'])}{SCORING_INSTRUCTION}]\n\nSTRICT OUTPUT CONSTRAINT:\n1. Use the <math_board>...</math_board> tag exclusively for long, multi-step calculus or derivations written in standard LaTeX.\n2. Use the <diagram_board>...</diagram_board> tag exclusively for free-body diagrams, system architectures, or flowcharts written in Mermaid.js syntax.\n3. Use the <simulation_board>...</simulation_board> tag exclusively to prompt the physics engine to generate a 3D visualization using Plotly/Three.js.\n\nThink deeply. Provide exhaustive, step-by-step derivations on the blackboard. Use simulations liberally to demonstrate complex systems. Never use these tags for normal conversation."]})
     messages.append({"role": "model", "parts": ["Understood. I will act as Young Jarvis and adhere to the strict output formatting."]})
@@ -256,7 +268,7 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
 
     # Save the interaction to Supabase safely
     text_to_save = text if text.strip() else "[File Attached]"
-    await cloud_engine.save_professor_message(session_id, "user", text_to_save)
-    await cloud_engine.save_professor_message(session_id, "young_jarvis", response_text)
+    await cloud_engine.save_professor_message(session_id, "user", text_to_save, user_id=user_id)
+    await cloud_engine.save_professor_message(session_id, "young_jarvis", response_text, user_id=user_id, teaching_score=teaching_score)
 
     return response_text, math_board, diagram_board, simulation_board, teaching_score

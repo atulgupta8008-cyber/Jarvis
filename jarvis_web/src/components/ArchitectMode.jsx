@@ -7,6 +7,8 @@ import ProfessorSidebar from './ProfessorSidebar';
 import { exportKnowledgeCapsule } from '../utils/exportKnowledgeCapsule';
 import { WS_URL } from '../config';
 
+import { useAuth } from '../context/AuthContext';
+
 function addChildToNode(node, targetId, child) {
   if (node.id === targetId) return { ...node, children: [...(node.children || []), child], loadingVariable: null };
   return node.children?.length
@@ -22,6 +24,7 @@ function setNodeLoading(node, targetId, variable) {
 }
 
 export default function ArchitectMode({ onExit }) {
+  const { user, profile, isAdmin } = useAuth();
   const [chatHistory, setChatHistory] = useState([]);
   const [blackboardWidgets, setBlackboardWidgets] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -35,23 +38,38 @@ export default function ArchitectMode({ onExit }) {
   const [isThinking, setIsThinking] = useState(false);
   const ws = useRef(null);
 
+  const myUserId = user?.id || (isAdmin ? 'admin_master' : 'guest_local');
+
   useEffect(() => {
-    // Isolated WebSocket connection for Professor Mode
+    // Isolated WebSocket connection for Architect Mode
     ws.current = new WebSocket(WS_URL);
     
     ws.current.onopen = () => {
-      console.log('Architect Mode Connected');
       // Fetch session list on load
-      ws.current.send(JSON.stringify({ type: 'professor_fetch_sessions', mode: 'architect' }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_fetch_sessions', 
+        mode: 'architect',
+        user_id: myUserId,
+        role: isAdmin ? 'admin' : 'user'
+      }));
       // Mute the voice agent
       ws.current.send(JSON.stringify({ type: 'system_command', action: 'pause_voice_agent' }));
       // Auto-create a brand new session for Architect Mode
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'architect' }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_create_session', 
+        mode: 'architect',
+        user_id: myUserId,
+        role: isAdmin ? 'admin' : 'user'
+      }));
     };
 
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Strict ownership check: reject any message tagged for a different account
+        const isMyMessage = !data.user_id || data.user_id === myUserId;
+        if (!isMyMessage) return;
         
         // INTERCEPTOR LOGIC
         if (data.type === 'professor_chat') {
@@ -64,12 +82,16 @@ export default function ArchitectMode({ onExit }) {
             setChatHistory(data.history.map(msg => ({ role: msg.role === 'young_jarvis' ? 'young_jarvis' : 'user', message: msg.content })));
           }
         } else if (data.type === 'professor_sessions_loaded') {
-          setSessions(data.sessions || []);
+          if (data.mode === 'architect') {
+            setSessions(data.sessions || []);
+          }
         } else if (data.type === 'professor_session_created') {
-          setActiveSessionId(data.session_id);
-          setResearchStatus('');
-          setChatHistory([]);
-          setBlackboardWidgets([]);
+          if (data.mode === 'architect') {
+            setActiveSessionId(data.session_id);
+            setResearchStatus('');
+            setChatHistory([]);
+            setBlackboardWidgets([]);
+          }
         } else if (data.type === 'blackboard_widget') {
           setBlackboardWidgets(prev => [...prev, {
             id: data.id,
@@ -110,7 +132,7 @@ export default function ArchitectMode({ onExit }) {
         ws.current.close(); 
       }
     };
-  }, []);
+  }, [myUserId]);
 
   const handleSendMessage = (payload) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN && activeSessionId) {
@@ -121,7 +143,10 @@ export default function ArchitectMode({ onExit }) {
         files: payload.files,
         deep_research: false,
         is_architect_mode: true,
-        session_id: activeSessionId 
+        session_id: activeSessionId,
+        user_profile: profile,
+        role: isAdmin ? 'admin' : 'user',
+        user_id: myUserId
       }));
       setChatHistory(prev => [...prev, { role: 'user', message: payload.text || "[File Attached]" }]);
     }
@@ -130,7 +155,7 @@ export default function ArchitectMode({ onExit }) {
   const handleNewSession = () => {
     setResearchStatus('');
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'architect' }));
+      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'architect', user_id: myUserId }));
     }
   };
 
@@ -139,14 +164,14 @@ export default function ArchitectMode({ onExit }) {
     setResearchStatus('');
     setBlackboardWidgets([]); // Clear blackboard for new topic
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'professor_load_history', session_id: id, mode: 'architect' }));
+      ws.current.send(JSON.stringify({ type: 'professor_load_history', session_id: id, mode: 'architect', user_id: myUserId }));
     }
     if (window.innerWidth <= 640) setIsSessionsOpen(false);
   };
 
   const handleDeleteSession = (id) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'professor_delete_session', session_id: id, mode: 'architect' }));
+      ws.current.send(JSON.stringify({ type: 'professor_delete_session', session_id: id, mode: 'architect', user_id: myUserId }));
       if (activeSessionId === id) {
         setActiveSessionId(null);
         setResearchStatus('');

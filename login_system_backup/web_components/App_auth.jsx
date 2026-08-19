@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Send, Activity, Radio, Cpu, Sparkles, MessageSquare, User } from 'lucide-react';
+import { Layers, Send, Activity, Radio, Cpu, Sparkles, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import InfinityCore from './components/InfinityCore';
 import ChatPanel from './components/ChatPanel';
@@ -38,9 +38,6 @@ const getModeFromPath = (pathname, search = window.location.search) => {
   const urlParams = new URLSearchParams(search);
   const qParam = urlParams.get('q') || urlParams.get('question');
   
-  if (path === '/profile') {
-    return { mode: 'nexus', isProfile: true, question: qParam };
-  }
   if (path === '/professor' || path === '/teacher' || path === '/socratic') {
     return { mode: 'professor', question: qParam };
   }
@@ -59,6 +56,9 @@ const getModeFromPath = (pathname, search = window.location.search) => {
   if (path === '/curiosity' || path === '/curiosity-feed') {
     return { mode: 'curiosity', question: qParam };
   }
+  if (path === '/profile' || path === '/my-profile') {
+    return { mode: 'profile', question: qParam };
+  }
   return { mode: 'nexus', question: qParam };
 };
 
@@ -70,6 +70,7 @@ const getPathFromMode = (mode, question) => {
   else if (mode === 'study-group') path = '/study-group';
   else if (mode === 'sandbox') path = '/sandbox';
   else if (mode === 'curiosity') path = '/curiosity';
+  else if (mode === 'profile') path = '/profile';
   
   if (question && mode === 'professor') {
     path += `?q=${encodeURIComponent(question)}`;
@@ -86,12 +87,13 @@ const getTitleFromMode = (mode) => {
     case 'study-group': return 'Study Group — Collaborative AI Debate | Jarvis';
     case 'sandbox': return 'Sandbox Workspace | Jarvis';
     case 'curiosity': return 'Curiosity Feed | Jarvis';
+    case 'profile': return 'My Profile & Preferences | Jarvis';
     default: return 'Jarvis AI — Personal Intelligence Platform';
   }
 };
 
 function AppContent() {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, isGuest, showAuthModal, setShowAuthModal, showSurveyModal, setShowSurveyModal } = useAuth();
   const [state, setState] = useState({
     status: 'sleeping',
     mainText: 'System Standby',
@@ -100,11 +102,11 @@ function AppContent() {
   const [chatHistory, setChatHistory] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfessorModeActive, setIsProfessorModeActive] = useState(false);
   const [isStudyGroupModeActive, setIsStudyGroupModeActive] = useState(false);
   const [isArchitectModeActive, setIsArchitectModeActive] = useState(false);
   const [isSandboxModeActive, setIsSandboxModeActive] = useState(false);
+  const [isProfileViewActive, setIsProfileViewActive] = useState(false);
   const [isNexusHubActive, setIsNexusHubActive] = useState(true);
   const [curiosityQuestion, setCuriosityQuestion] = useState(null);
   const [commandText, setCommandText] = useState('');
@@ -113,12 +115,37 @@ function AppContent() {
   const [mobileTab, setMobileTab] = useState('chat');
   const ws = useRef(null);
 
+  // Load and isolate Assistant HUD chat history per active user
+  useEffect(() => {
+    const key = `jarvis_assistant_history_${user?.id || 'guest'}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setChatHistory(JSON.parse(saved));
+      } else {
+        setChatHistory([]);
+      }
+    } catch {
+      setChatHistory([]);
+    }
+  }, [user?.id]);
+
+  // Persist Assistant HUD chat history per active user
+  useEffect(() => {
+    const key = `jarvis_assistant_history_${user?.id || 'guest'}`;
+    try {
+      localStorage.setItem(key, JSON.stringify(chatHistory.slice(-40)));
+    } catch {
+    }
+  }, [chatHistory, user?.id]);
+
   const applyRoute = (mode, question = null, pushState = true) => {
     setIsNexusHubActive(mode === 'nexus');
     setIsProfessorModeActive(mode === 'professor');
     setIsStudyGroupModeActive(mode === 'study-group');
     setIsArchitectModeActive(mode === 'architect');
     setIsSandboxModeActive(mode === 'sandbox');
+    setIsProfileViewActive(mode === 'profile');
     setIsCuriosityDashboardOpen(mode === 'curiosity');
     if (question !== undefined) {
       setCuriosityQuestion(question);
@@ -136,16 +163,10 @@ function AppContent() {
 
   useEffect(() => {
     const route = getModeFromPath(window.location.pathname, window.location.search);
-    if (route.isProfile) {
-      setIsProfileOpen(true);
-    }
     applyRoute(route.mode, route.question, false);
 
     const onPopState = () => {
       const currentRoute = getModeFromPath(window.location.pathname, window.location.search);
-      if (currentRoute.isProfile) {
-        setIsProfileOpen(true);
-      }
       applyRoute(currentRoute.mode, currentRoute.question, false);
     };
 
@@ -153,13 +174,6 @@ function AppContent() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // Account switch / logout: reset conversation display to isolate accounts
-  useEffect(() => {
-    setChatHistory([]);
-    setDashboardData(null);
-  }, [user?.id, isAdmin]);
-
-  // Keep Main WebSocket connection alive
   useEffect(() => {
     let isSubscribed = true;
     let reconnectTimeout = null;
@@ -191,8 +205,6 @@ function AppContent() {
             } else if (data.type === 'state') {
               setState({ status: data.state, mainText: data.main_text, subText: data.sub_text });
             } else if (data.type === 'chat') {
-              const myUserKey = user?.id || (isAdmin ? 'admin_master' : 'guest_local');
-              if (data.user_id && data.user_id !== myUserKey) return;
               setChatHistory(prev => {
                 if ((data.role === 'You' || data.role === 'user') && prev.length > 0) {
                   const lastMsg = prev[prev.length - 1];
@@ -216,8 +228,7 @@ function AppContent() {
           }
         };
 
-        socket.onerror = () => {
-        };
+        socket.onerror = () => {};
       } catch {
         if (isSubscribed) {
           reconnectTimeout = setTimeout(connectWebSocket, 3000);
@@ -237,13 +248,12 @@ function AppContent() {
     };
   }, []);
 
-  // Dynamically re-request curiosity feed when user subjects or language changes
   useEffect(() => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ 
+    if (ws.current && ws.current.readyState === WebSocket.OPEN && profile?.interested_subjects) {
+      ws.current.send(JSON.stringify({
         type: 'curiosity_feed_request',
-        interested_subjects: profile?.interested_subjects,
-        language: profile?.language,
+        interested_subjects: profile.interested_subjects,
+        language: profile.language,
         user_id: user?.id,
         role: isAdmin ? 'admin' : 'user',
         user_profile: profile
@@ -251,25 +261,12 @@ function AppContent() {
     }
   }, [profile?.interested_subjects, profile?.language, user?.id, isAdmin]);
 
-  const handleLaunchMode = (mode) => {
-    applyRoute(mode, null, true);
-  };
-
-  const handleLaunchCuriosity = (question) => {
-    applyRoute('professor', question, true);
-  };
-
-  const handleReturnToNexus = () => {
-    applyRoute('nexus', null, true);
-  };
-
-  const handleOpenCuriosity = () => {
-    applyRoute('curiosity', null, true);
-  };
-
-  const handleCloseCuriosity = () => {
-    applyRoute('nexus', null, true);
-  };
+  const handleLaunchMode = (mode) => applyRoute(mode, null, true);
+  const handleLaunchCuriosity = (question) => applyRoute('professor', question, true);
+  const handleReturnToNexus = () => applyRoute('nexus', null, true);
+  const handleOpenCuriosity = () => applyRoute('curiosity', null, true);
+  const handleCloseCuriosity = () => applyRoute('nexus', null, true);
+  const handleOpenProfile = () => applyRoute('profile', null, true);
 
   const playBeep = () => {
     try {
@@ -302,19 +299,27 @@ function AppContent() {
       ws.current.send(JSON.stringify({ 
         type: 'text_command', 
         text: cleanText,
-        user_profile: profile,
+        user_id: user?.id,
         role: isAdmin ? 'admin' : 'user',
-        user_id: user?.id
+        user_profile: profile
       }));
     }
     setCommandText('');
   };
 
-  const isAssistantActive = !isNexusHubActive && !isProfessorModeActive && !isStudyGroupModeActive && !isArchitectModeActive && !isSandboxModeActive;
+  const handleCommandSubmit = (e) => {
+    if (e.key === 'Enter') {
+      sendCommand(commandText);
+    }
+  };
+
+  const isAssistantActive = !isNexusHubActive && !isProfessorModeActive && !isStudyGroupModeActive && !isArchitectModeActive && !isSandboxModeActive && !isProfileViewActive;
 
   return (
     <>
-      {/* JARVIS AI ASSISTANT HUD */}
+      {/* =========================================================================
+          JARVIS AI ASSISTANT HUD (TELEMETRY + QUANTUM SIMULATION & COMPLETE CHAT)
+          ========================================================================= */}
       {isAssistantActive && (
         <div className="hud-container assistant-stage-layout">
           <BackgroundFX status={state.status} />
@@ -354,30 +359,6 @@ function AppContent() {
                 <span className="status-label">{state.status.toUpperCase()}</span>
               </div>
             </div>
-
-            <div className="assistant-header-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setIsProfileOpen(true)}
-                title="Profile & Settings"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  padding: '6px 10px',
-                  color: '#f4f7ff',
-                  fontFamily: 'DM Mono, monospace',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <User size={13} />
-                <span>{isAdmin ? 'Admin' : (profile?.display_name || 'Profile')}</span>
-              </button>
-            </div>
           </header>
 
           <main className="assistant-stage-grid">
@@ -406,32 +387,23 @@ function AppContent() {
               </div>
 
               <div className="assistant-chat-stream-window">
-                <ChatPanel history={chatHistory} theme="default" />
+                <ChatPanel history={chatHistory} messages={chatHistory} />
               </div>
 
               <div className="assistant-terminal-bar">
                 <span className="command-prompt">&gt;</span>
                 <input 
                   type="text" 
-                  className="command-input" 
-                  placeholder="Ask Jarvis anything or speak directive..." 
+                  className="command-input"
+                  placeholder="Direct intelligence query or command..."
                   value={commandText}
                   onChange={(e) => setCommandText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && commandText.trim()) {
-                      sendCommand(commandText);
-                    }
-                  }}
+                  onKeyDown={handleCommandSubmit}
                 />
                 <button 
-                  type="button"
                   className="assistant-send-btn"
+                  onClick={() => sendCommand(commandText)}
                   disabled={!commandText.trim()}
-                  onClick={() => {
-                    if (commandText.trim()) {
-                      sendCommand(commandText);
-                    }
-                  }}
                   title="Send Command"
                 >
                   <Send size={15} />
@@ -442,23 +414,24 @@ function AppContent() {
         </div>
       )}
 
-      {/* Landing Page Feedback Modal */}
+      {/* Global Modals */}
       <FeedbackModal 
         isOpen={isFeedbackOpen}
         onClose={() => setIsFeedbackOpen(false)}
       />
 
-      {/* Profile Management View */}
-      {isProfileOpen && (
-        <ProfileView onClose={() => setIsProfileOpen(false)} />
-      )}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
 
-      {/* Authentication and Onboarding Modals */}
-      <AuthModal />
-      <OnboardingSurvey />
+      <OnboardingSurvey 
+        isOpen={showSurveyModal}
+        onClose={() => setShowSurveyModal(false)}
+      />
 
       {/* Global Curiosity Orb & Dashboard Modal */}
-      {isNexusHubActive && !isCuriosityDashboardOpen && (
+      {isNexusHubActive && !isCuriosityDashboardOpen && !isProfileViewActive && (
         <CuriosityOrb 
           hooks={curiosityHooks} 
           onOpenDashboard={handleOpenCuriosity}
@@ -485,14 +458,17 @@ function AppContent() {
         curiosityHooks={curiosityHooks}
         onOpenCuriosityDashboard={handleOpenCuriosity}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
-        onOpenProfile={() => setIsProfileOpen(true)}
-        user={user}
-        profile={profile}
-        isAdmin={isAdmin}
+        onOpenProfile={handleOpenProfile}
       />
 
-      {/* Full-Screen Workspaces */}
+      {/* Full-Screen Sub-Webpage Views */}
       <AnimatePresence>
+        {isProfileViewActive && (
+          <ProfileView 
+            onExit={handleReturnToNexus}
+            onOpenAuth={() => setShowAuthModal(true)}
+          />
+        )}
         {isProfessorModeActive && (
           <ProfessorMode 
             initialQuestion={curiosityQuestion}

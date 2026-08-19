@@ -1,0 +1,162 @@
+/* =========================================================================
+   MY PROFILE & PREFERENCES PAGE STYLING
+   ========================================================================= */
+
+.profile-page-container {
+  height: 100vh;
+  width: 100vw;
+  background: #030508;
+  color: #f4f7ff;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.profile-bg-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: 
+    radial-gradient(circle at 15% 20%, rgba(110, 246, 247, 0.06), transparent 35%),
+    radial-gradient(circle at 85% 80%, rgba(169, 150, 255, 0.06), transparent 35%);
+  z-index: 0;
+}
+
+.profile-nav {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(20px, 4vw, 48px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(3, 5, 8, 0.85);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.profile-nav-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c8d0e0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile-nav-back:hover {
+  background: rgba(110, 246, 247, 0.1);
+  border-color: rgba(110, 246, 247, 0.3);
+  color: #6ef6f7;
+  transform: translateX(-2px);
+}
+
+.profile-content-wrapper {
+  max-width: 980px;
+  width: 100%;
+  margin: 40px auto;
+  padding: 0 clamp(20px, 3vw, 36px);
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.profile-hero-card {
+  background: linear-gradient(135deg, rgba(20, 26, 45, 0.8), rgba(8, 12, 24, 0.85));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.profile-avatar-block {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.profile-avatar-hex {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-family: 'Syne', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #030508;
+  box-shadow: 0 0 30px rgba(110, 246, 247, 0.3);
+}
+
+.profile-meta h1 {
+  margin: 0 0 6px;
+  font-family: 'Syne', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.profile-section-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Syne', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.profile-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .profile-hero-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .profile-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}

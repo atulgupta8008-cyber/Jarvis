@@ -80,7 +80,7 @@ const stats = [
   { value: 'VOICE', label: 'NATIVE COMMANDS' },
 ];
 
-export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaunchCuriosity, onOpenCuriosityDashboard, onOpenFeedback }) {
+export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaunchCuriosity, onOpenCuriosityDashboard, onOpenFeedback, onOpenProfile, user, profile, isAdmin }) {
   const [scroll, setScroll] = useState(0);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -136,7 +136,34 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
           <button className="nav-link" onClick={() => jump('core')}>Core</button>
           <button className="nav-link" onClick={onOpenFeedback} style={{ color: 'var(--cyan, #6ef6f7)' }}>Feedback</button>
         </div>
-        <div className="nav-right">
+        <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button 
+            type="button"
+            onClick={onOpenProfile}
+            title={user ? (profile?.display_name || user.email) : "Sign In / Profile"}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              color: '#f4f7ff',
+              fontFamily: 'DM Mono, monospace',
+              fontSize: '11px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <div style={{
+              width: '18px', height: '18px', borderRadius: '50%',
+              background: isAdmin ? 'linear-gradient(135deg, #f59e0b, #ef4444)' : 'linear-gradient(135deg, var(--cyan, #6ef6f7), var(--violet, #a996ff))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '10px', fontWeight: 'bold', color: '#030508'
+            }}>
+              {isAdmin ? '★' : ((profile?.display_name || user?.email || 'G')[0].toUpperCase())}
+            </div>
+            <span>{isAdmin ? 'Admin' : (profile?.display_name || (user ? 'Profile' : 'Sign In'))}</span>
+          </button>
           <button className="btn-launch" onClick={() => go('professor')}>Open Jarvis <ArrowRight size={14} /></button>
           <button className="mobile-menu-toggle" onClick={() => setMobileMenu(true)} aria-label="Menu"><Menu size={22} /></button>
         </div>
@@ -164,6 +191,22 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
               style={{ color: 'var(--cyan, #6ef6f7)' }}
             >
               Feedback & Signals
+            </motion.button>
+            <motion.button className="mob-link"
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.33 }}
+              onClick={() => { setMobileMenu(false); onOpenProfile?.(); }}
+              style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <div style={{
+                width: '18px', height: '18px', borderRadius: '50%',
+                background: isAdmin ? 'linear-gradient(135deg, #f59e0b, #ef4444)' : 'linear-gradient(135deg, var(--cyan, #6ef6f7), var(--violet, #a996ff))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '10px', fontWeight: 'bold', color: '#030508'
+              }}>
+                {isAdmin ? '★' : ((profile?.display_name || user?.email || 'G')[0].toUpperCase())}
+              </div>
+              <span>{isAdmin ? 'Admin Profile' : (profile?.display_name || (user ? 'My Profile' : 'Sign In / Profile'))}</span>
             </motion.button>
             <motion.button className="btn-launch" style={{ marginTop: 16 }}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}

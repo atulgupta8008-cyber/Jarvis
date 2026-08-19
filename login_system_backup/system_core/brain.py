@@ -245,58 +245,47 @@ class JarvisBrain:
         else:
             return AsyncGroq(api_key=config.GROQ_API_KEY), "llama-3.1-8b-instant", "Groq Fast Core"
 
-    async def think(self, user_prompt: str, conversation_history: list, use_tools: bool = True, input_type: str = "text", user_profile: dict = None, role: str = "user", user_id: str = None) -> tuple:
+    async def think(self, user_prompt: str, conversation_history: list, use_tools: bool = True, input_type: str = "text") -> tuple:
         client, model_name, core_name = self._get_active_client()
         active_brain = api_config.get_preference("active_brain")
         
-        # --- DYNAMIC DOSSIER ROUTING ---
-        is_admin_user = (role == "admin" or user_id == "admin_master")
-        dossier_file = "admin_dossier.md" if is_admin_user else "user_dossier.md"
-        dossier_path = os.path.join(os.path.dirname(__file__), "..", dossier_file)
-        
-        try:
-            with open(dossier_path, "r", encoding="utf-8") as f:
-                context_profile = f.read()
-        except FileNotFoundError:
-            context_profile = "User Dossier missing."
-
-        user_lang = (user_profile.get("language") if user_profile else "English") or "English"
-        if user_lang == "Hinglish":
-            lang_directive = "LANGUAGE DIRECTIVE: You MUST respond in natural, conversational Hinglish (Hindi written in Roman/English alphabet blended seamlessly with precise English technical terms, e.g. 'Haan, first principles se breakdown karte hain...')."
+        # --- DYNAMIC INFINITE CONTEXT ROUTING ---
+        if active_brain == "gemini":
+            # Omniscient Mode: Infinite Context
+            dossier_path = os.path.join(os.path.dirname(__file__), "..", "user_dossier.md")
+            try:
+                with open(dossier_path, "r", encoding="utf-8") as f:
+                    context_profile = f.read()
+            except FileNotFoundError:
+                context_profile = "User Dossier missing."
+                
+            facts = self.memory_manager.memory["facts"][-20:] # Pull up to 20 deep semantic memories
+            facts_str = "; ".join(facts) if facts else "None"
+            
         else:
-            lang_directive = "LANGUAGE DIRECTIVE: You MUST respond in crisp, articulate English."
-
-        # Adapt student context for normal users
-        if not is_admin_user and user_profile:
-            name = user_profile.get("display_name", "Scholar")
-            subs = ", ".join(user_profile.get("interested_subjects", ["Physics", "Mathematics"])) if isinstance(user_profile.get("interested_subjects"), list) else str(user_profile.get("interested_subjects", ""))
-            context_profile += f"\n\n[ACTIVE LEARNER: Name: {name} | Language: {user_lang} | Subject Interests: {subs}]"
-
-        facts = self.memory_manager.memory["facts"][-20:]
-        facts_str = "; ".join(facts) if facts else "None"
+            # Fast Mode (Groq): Ultra-Lean Token Compression via groq_directive.md
+            directive_path = os.path.join(os.path.dirname(__file__), "..", "groq_directive.md")
+            try:
+                with open(directive_path, "r", encoding="utf-8") as f:
+                    context_profile = f.read()
+            except FileNotFoundError:
+                profile = self.memory_manager.memory["user_profile"]
+                context_profile = f"User: {profile['Name']}. Goal: {profile['Goal']}. Philosophy: First Principles."
+            
+            facts = self.memory_manager.memory["facts"][-2:] # Pull ONLY the absolute most recent 2 memories
+            facts_str = "; ".join(facts) if facts else "None"
         
         active_macros = macro_ops.get_all_routines_text()
         current_time_context = datetime.now().strftime("%A, %B %d, %Y - %I:%M %p")
 
-        if is_admin_user:
-            assistant_intro = (
-                "You are J.A.R.V.I.S., Tony Stark's elite AI assistant. You are hyper-intelligent, proactive, sharp, witty, and profoundly loyal to Atul's mission of building world-class technology and reaching MIT. "
-                "You speak concisely and elegantly. Never use emojis. You treat Atul as a brilliant inventor."
-            )
-        else:
-            assistant_intro = (
-                "You are J.A.R.V.I.S., an elite AI assistant and Socratic thinking partner. You are hyper-intelligent, proactive, sharp, witty, and deeply supportive of the user's intellectual growth. "
-                "You speak concisely and elegantly. Never use emojis. You treat the user with respect and intellectual clarity."
-            )
-
         system_prompt = (
             f"Time: {current_time_context}\n"
-            f"[{lang_directive}]\n"
             f"[CONTEXT DOSSIER]\n{context_profile}\n"
             f"[MEMORIES: {facts_str}]\n"
             f"[MACROS: {active_macros}]\n"
             f"[ACTIVE CORE: {core_name}]\n\n"
-            f"{assistant_intro}\n"
+            "You are J.A.R.V.I.S., Tony Stark's elite AI assistant. You are hyper-intelligent, proactive, sharp, witty, and profoundly loyal to the user's mission of building world-class technology and reaching MIT. "
+            "You speak concisely and elegantly. Never use emojis. You treat the user like a brilliant inventor. "
             f"Current Input Mode: {input_type.upper()}. Adjust your brevity accordingly (if voice, keep it very concise and punchy; if text, you can be slightly more detailed but still sharp).\n"
             "RULES:\n"
             "1. Do not use tools for simple logic or personal questions.\n"

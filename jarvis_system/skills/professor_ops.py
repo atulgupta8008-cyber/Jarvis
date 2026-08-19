@@ -10,6 +10,18 @@ from skills.deep_research import deep_research_protocol
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
 
+SOCRATIC_PROFESSOR_PROMPT = """
+You are a distinguished MIT Professor of Physics, Mathematics, and Advanced Engineering.
+Your teaching method is strictly Socratic and built on first-principles thinking.
+
+CORE SOCRATIC LAWS:
+1. NEVER spoon-feed answers or write the complete final derivation in one go without the student's active involvement.
+2. Ask probing, foundational questions that break complex phenomena down into fundamental physical and mathematical truths.
+3. Challenge the student's intuition with real-world thought experiments and edge cases.
+4. When derivations are required, lead the student step-by-step, providing the scaffolding on the blackboard (<math_board>) and asking them to identify the next logical step or missing term.
+5. Use visualizations and diagrams (<diagram_board>, <simulation_board>) to ground abstract equations in physical reality.
+"""
+
 TIME_MACHINE_PROMPT = """
 SYSTEM OVERRIDE: TIME MACHINE ENGAGED.
 You are now running a historical discovery simulation. Analyze the conversation history to determine the current Act.
@@ -51,7 +63,18 @@ RULE 3 (No Spoilers): DO NOT give them the bridging equation. Give them a hint a
 RULE 4 (Tone): Act as an eccentric genius pushing them to see the matrix. Use phrases like, 'Zoom out, Atul. Look at the architecture of the system. What connects a dying star to a crashing stock market?'
 """
 
-async def handle_professor_query(session_id: str, text: str, files_data: list, deep_research: bool = False, is_epiphany_mode: bool = False, is_collider_mode: bool = False, send_ui_update=None) -> tuple:
+async def handle_professor_query(
+    session_id: str, 
+    text: str, 
+    files_data: list, 
+    deep_research: bool = False, 
+    is_epiphany_mode: bool = False, 
+    is_collider_mode: bool = False, 
+    send_ui_update=None,
+    user_profile: dict = None,
+    role: str = "user",
+    user_id: str = None
+) -> tuple:
     """
     Handles a full Socratic Professor mode query.
     Takes the session ID, text, array of base64 files, deep_research flag, is_epiphany_mode flag, and is_collider_mode flag.
@@ -121,9 +144,9 @@ async def handle_professor_query(session_id: str, text: str, files_data: list, d
 
     # 2. Memory Orchestration
     # A. Load History
-    history = await cloud_engine.load_professor_session(session_id)
-    # B. Load Dossier
-    dossier = await cloud_engine.fetch_professor_dossier()
+    history = await cloud_engine.load_professor_session(session_id, user_id=user_id)
+    # B. Load Master Socratic Prompt directly from system codebase
+    dossier = SOCRATIC_PROFESSOR_PROMPT
     
     # 2.5: Branch to Deep Research if requested
     if deep_research and send_ui_update is not None:
@@ -147,9 +170,25 @@ async def handle_professor_query(session_id: str, text: str, files_data: list, d
         # Inject Dossier and optional Epiphany/Collider Overrides as system instruction equivalent
         system_guardrails = f"[SYSTEM GUARDRAILS: {dossier}]"
         if is_epiphany_mode:
-            system_guardrails += f"\n\n{TIME_MACHINE_PROMPT}"
+            # Determine act progression
+            act_num = 1
+            if len(history) >= 4: act_num = 3
+            elif len(history) >= 2: act_num = 2
+            system_guardrails += f"\n\n{TIME_MACHINE_PROMPT}\n[CURRENT PROGRESS: You are currently on ACT {act_num}. You MUST append [ACT:{act_num}] on a new line at the very end of your response.]"
         if is_collider_mode:
             system_guardrails += f"\n\n{COLLIDER_PROMPT_OVERRIDE}"
+
+        user_lang = (user_profile.get("language") if user_profile else "English") or "English"
+        if user_lang == "Hinglish":
+            lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in natural, conversational Hinglish (Hindi written in Roman/English alphabet blended with technical English words, e.g. 'Dekho, first principles se samjhte hain...')."
+        else:
+            lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in crisp, articulate academic English."
+        system_guardrails += f"\n\n[{lang_directive}]"
+
+        if user_profile:
+            name = "Atul" if role == "admin" else (user_profile.get("display_name") or "Scholar")
+            subs = ", ".join(user_profile.get("interested_subjects", ["Physics", "Mathematics"])) if isinstance(user_profile.get("interested_subjects"), list) else str(user_profile.get("interested_subjects", ""))
+            system_guardrails += f"\n\n[ACTIVE LEARNER: Name: {name} | Preferred Language: {user_lang} | Subject Interests: {subs}]"
 
         system_guardrails += "\n\nSTRICT OUTPUT CONSTRAINT:\n1. Use the <math_board>...</math_board> tag exclusively for long, multi-step calculus or derivations written in standard LaTeX.\n2. Use the <diagram_board>...</diagram_board> tag exclusively for free-body diagrams, system architectures, or flowcharts written in Mermaid.js syntax.\n3. Use the <simulation_board>...</simulation_board> tag exclusively to prompt the physics engine to generate a 3D visualization using Plotly/Three.js.\n\nThink deeply. Provide exhaustive, step-by-step derivations on the blackboard. Use simulations liberally to demonstrate complex systems. Never use these tags for normal conversation."
 
@@ -292,8 +331,8 @@ async def handle_professor_query(session_id: str, text: str, files_data: list, d
 
     # Save the interaction to Supabase safely
     text_to_save = text if text.strip() else "[File Attached]"
-    await cloud_engine.save_professor_message(session_id, "user", text_to_save)
-    await cloud_engine.save_professor_message(session_id, "jarvis", response_text)
+    await cloud_engine.save_professor_message(session_id, "user", text_to_save, user_id=user_id)
+    await cloud_engine.save_professor_message(session_id, "jarvis", response_text, user_id=user_id)
 
     return response_text, math_board, diagram_board, simulation_board
 

@@ -18,7 +18,6 @@ from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
 # Import Core Modules
-from core.ears import wait_for_wake_word, listen_and_transcribe
 from core.brain import JarvisBrain
 
 # Import All Skill Modules
@@ -147,9 +146,9 @@ async def cleanup_loop():
         await asyncio.sleep(20)
 
 async def jarvis_processing_loop():
-    """Main processing loop that handles inputs from the queue."""
+    """Main processing loop that handles inputs from the queue with strict user isolation."""
     brain = JarvisBrain()
-    user_conversation_histories = {}
+    user_conversations: dict[str, list] = {}
     
     os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
     
@@ -168,25 +167,27 @@ async def jarvis_processing_loop():
             continue
         
         # --- PHASE 3 & 4: THE COGNITIVE ROUTER & SESSION MANAGEMENT ---
+        user_id = command.get("user_id")
+        user_role = command.get("role", "user")
+        user_profile = command.get("user_profile")
+
         if input_type == "professor_fetch_sessions":
             mode = command.get("mode", "professor")
-            user_id = command.get("user_id")
             try:
                 sessions = await professor_ops.cloud_engine.fetch_all_sessions(mode=mode, user_id=user_id)
-                await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions, "user_id": user_id, "mode": mode})
+                await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions})
             except Exception as e:
                 print("Error fetching sessions:", e)
             continue
             
         if input_type == "professor_create_session":
             mode = command.get("mode", "professor")
-            user_id = command.get("user_id")
             try:
                 new_id = await professor_ops.cloud_engine.get_or_create_empty_session(mode=mode, user_id=user_id)
-                await manager.broadcast({"type": "professor_session_created", "session_id": new_id, "user_id": user_id, "mode": mode})
-                # Auto-refresh sessions list for this user
+                await manager.broadcast({"type": "professor_session_created", "session_id": new_id})
+                # Auto-refresh sessions list
                 sessions = await professor_ops.cloud_engine.fetch_all_sessions(mode=mode, user_id=user_id)
-                await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions, "user_id": user_id, "mode": mode})
+                await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions})
             except Exception as e:
                 print("Error creating session:", e)
             continue
@@ -194,12 +195,11 @@ async def jarvis_processing_loop():
         if input_type == "professor_delete_session":
             session_id = command.get("session_id")
             mode = command.get("mode", "professor")
-            user_id = command.get("user_id")
             if session_id:
                 try:
-                    await professor_ops.cloud_engine.delete_session(session_id)
+                    await professor_ops.cloud_engine.delete_session(session_id, user_id=user_id)
                     sessions = await professor_ops.cloud_engine.fetch_all_sessions(mode=mode, user_id=user_id)
-                    await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions, "user_id": user_id, "mode": mode})
+                    await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions})
                 except Exception as e:
                     print("Error deleting session:", e)
             continue
@@ -223,12 +223,11 @@ async def jarvis_processing_loop():
 
         if input_type == "professor_load_history":
             session_id = command.get("session_id", "default_academic_session")
-            user_id = command.get("user_id")
             try:
-                history = await professor_ops.cloud_engine.load_professor_session(session_id, user_id=user_id)
-                await manager.broadcast({"type": "professor_history_loaded", "history": history, "session_id": session_id, "user_id": user_id})
+                history = await professor_ops.cloud_engine.load_session_messages(session_id, user_id=user_id)
+                await manager.broadcast({"type": "professor_history_loaded", "history": history})
                 media_list = await professor_ops.cloud_engine.fetch_session_media(session_id, user_id=user_id)
-                await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list, "user_id": user_id})
+                await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
             except Exception:
                 pass
             continue
@@ -237,7 +236,7 @@ async def jarvis_processing_loop():
             session_id = command.get("session_id")
             if session_id:
                 try:
-                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id)
+                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id, user_id=user_id)
                     await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
                 except Exception as e:
                     print(f"Error fetching media for {session_id}: {e}")
@@ -248,8 +247,8 @@ async def jarvis_processing_loop():
             media_id = command.get("media_id")
             if session_id and media_id:
                 try:
-                    await professor_ops.cloud_engine.delete_session_media(session_id, media_id)
-                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id)
+                    await professor_ops.cloud_engine.delete_session_media(session_id, media_id, user_id=user_id)
+                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id, user_id=user_id)
                     await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
                 except Exception as e:
                     print(f"Error deleting media {media_id}: {e}")
@@ -265,9 +264,10 @@ async def jarvis_processing_loop():
                         name=file_obj.get("name", "document.pdf"),
                         mime=file_obj.get("mime", "application/pdf"),
                         size=file_obj.get("size", 0),
-                        base64_data=file_obj.get("data", "")
+                        base64_data=file_obj.get("data", ""),
+                        user_id=user_id
                     )
-                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id)
+                    media_list = await professor_ops.cloud_engine.fetch_session_media(session_id, user_id=user_id)
                     await manager.broadcast({"type": "professor_media_loaded", "session_id": session_id, "media": media_list})
                 except Exception as e:
                     print(f"Error uploading media for {session_id}: {e}")
@@ -276,9 +276,8 @@ async def jarvis_processing_loop():
         if input_type == "professor_query":
             await manager.broadcast({"type": "state", "state": "executing", "main_text": "Professor Mode", "sub_text": "Analyzing document and context..."})
             
-            # Extract user_id and session_id at the TOP so all branches use them
+            # The UI should ideally send a unique session ID, we'll hardcode one for this specific demo/phase if missing
             session_id = command.get("session_id", "default_academic_session")
-            user_id = command.get("user_id")
             files_data = command.get("files", [])
             is_deep_research = command.get("deep_research", False)
             
@@ -286,20 +285,16 @@ async def jarvis_processing_loop():
                 if payload.get("status") == "stream_chunk":
                     await manager.broadcast({
                         "type": "professor_stream_chunk",
-                        "chunk": payload.get("chunk", ""),
-                        "session_id": session_id,
-                        "user_id": user_id
+                        "chunk": payload.get("chunk", "")
                     })
                 else:
                     await manager.broadcast({
                         "type": "research_status",
-                        "status": payload.get("status", ""),
-                        "session_id": session_id,
-                        "user_id": user_id
+                        "status": payload.get("status", "")
                     })
             
             try:
-                await manager.broadcast({"type": "professor_thinking", "is_thinking": True, "session_id": session_id, "user_id": user_id})
+                await manager.broadcast({"type": "professor_thinking", "is_thinking": True})
                 
                 is_study_group = command.get("is_study_group", False)
                 is_sandbox_mode = command.get("is_sandbox_mode", False)
@@ -308,56 +303,51 @@ async def jarvis_processing_loop():
                 
                 if is_sandbox_mode:
                     response_text, math_board, diagram_board, simulation_board = await sandbox_ops.handle_sandbox_query(
-                        session_id, user_text, send_ui_update=_send_ui_update
+                        session_id, user_text, send_ui_update=_send_ui_update,
+                        user_id=user_id, role=user_role, user_profile=user_profile
                     )
-                    await manager.broadcast({"type": "professor_thinking", "is_thinking": False, "session_id": session_id, "user_id": user_id})
-                    await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": response_text, "session_id": session_id, "user_id": user_id})
+                    await manager.broadcast({"type": "professor_thinking", "is_thinking": False})
+                    await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": response_text})
                     # Broadcast board widgets
                     if math_board:
-                        await manager.broadcast({"type": "blackboard_widget", "widget_type": "math", "content": math_board, "id": str(uuid.uuid4()), "author": "jarvis", "session_id": session_id, "user_id": user_id})
+                        await manager.broadcast({"type": "blackboard_widget", "widget_type": "math", "content": math_board, "id": str(uuid.uuid4()), "author": "jarvis"})
                     if diagram_board:
-                        await manager.broadcast({"type": "blackboard_widget", "widget_type": "diagram", "content": diagram_board, "id": str(uuid.uuid4()), "author": "jarvis", "session_id": session_id, "user_id": user_id})
+                        await manager.broadcast({"type": "blackboard_widget", "widget_type": "diagram", "content": diagram_board, "id": str(uuid.uuid4()), "author": "jarvis"})
                     if simulation_board:
                         sim_url = await physics_ops.simulate_physics(simulation_board)
                         if not sim_url.startswith("Error"):
-                            await manager.broadcast({"type": "blackboard_widget", "widget_type": "simulation", "content": sim_url, "id": str(uuid.uuid4()), "author": "jarvis", "session_id": session_id, "user_id": user_id})
+                            await manager.broadcast({"type": "blackboard_widget", "widget_type": "simulation", "content": sim_url, "id": str(uuid.uuid4()), "author": "jarvis"})
                 elif is_study_group:
                     target_agent = command.get("target_agent", "all")
                     vance_res, ada_res = await study_group.handle_study_group_query(
-                        session_id, user_text, files_data, target_agent, 
-                        send_ui_update=_send_ui_update,
-                        user_id=user_id,
-                        role=command.get("role", "user"),
-                        user_profile=command.get("user_profile")
+                        session_id, user_text, files_data, target_agent, send_ui_update=_send_ui_update,
+                        user_id=user_id, role=user_role, user_profile=user_profile
                     )
-                    await manager.broadcast({"type": "professor_thinking", "is_thinking": False, "session_id": session_id, "user_id": user_id})
+                    await manager.broadcast({"type": "professor_thinking", "is_thinking": False})
                     
                     if vance_res:
                         # Broadcast Vance
-                        await manager.broadcast({"type": "professor_chat", "role": "vance", "message": vance_res[0], "session_id": session_id, "user_id": user_id})
-                        if vance_res[1]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "math", "content": vance_res[1], "id": str(uuid.uuid4()), "author": "vance", "session_id": session_id, "user_id": user_id})
-                        if vance_res[2]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "diagram", "content": vance_res[2], "id": str(uuid.uuid4()), "author": "vance", "session_id": session_id, "user_id": user_id})
+                        await manager.broadcast({"type": "professor_chat", "role": "vance", "message": vance_res[0]})
+                        if vance_res[1]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "math", "content": vance_res[1], "id": str(uuid.uuid4()), "author": "vance"})
+                        if vance_res[2]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "diagram", "content": vance_res[2], "id": str(uuid.uuid4()), "author": "vance"})
                         if vance_res[3]:
                             sim_url = await physics_ops.simulate_physics(vance_res[3])
                             if not sim_url.startswith("Error"):
-                                await manager.broadcast({"type": "blackboard_widget", "widget_type": "simulation", "content": sim_url, "id": str(uuid.uuid4()), "author": "vance", "session_id": session_id, "user_id": user_id})
+                                await manager.broadcast({"type": "blackboard_widget", "widget_type": "simulation", "content": sim_url, "id": str(uuid.uuid4()), "author": "vance"})
                             
                     if ada_res:
                         # Broadcast Ada
-                        await manager.broadcast({"type": "professor_chat", "role": "ada", "message": ada_res[0], "session_id": session_id, "user_id": user_id})
-                        if ada_res[1]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "math", "content": ada_res[1], "id": str(uuid.uuid4()), "author": "ada", "session_id": session_id, "user_id": user_id})
-                        if ada_res[2]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "diagram", "content": ada_res[2], "id": str(uuid.uuid4()), "author": "ada", "session_id": session_id, "user_id": user_id})
+                        await manager.broadcast({"type": "professor_chat", "role": "ada", "message": ada_res[0]})
+                        if ada_res[1]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "math", "content": ada_res[1], "id": str(uuid.uuid4()), "author": "ada"})
+                        if ada_res[2]: await manager.broadcast({"type": "blackboard_widget", "widget_type": "diagram", "content": ada_res[2], "id": str(uuid.uuid4()), "author": "ada"})
                         if ada_res[3]:
                             sim_url = await physics_ops.simulate_physics(ada_res[3])
                             if not sim_url.startswith("Error"):
-                                await manager.broadcast({"type": "blackboard_widget", "widget_type": "simulation", "content": sim_url, "id": str(uuid.uuid4()), "author": "ada", "session_id": session_id, "user_id": user_id})
+                                await manager.broadcast({"type": "blackboard_widget", "widget_type": "simulation", "content": sim_url, "id": str(uuid.uuid4()), "author": "ada"})
                             
                 else:
                     is_architect_mode = command.get("is_architect_mode", False)
                     teaching_score = None
-                    user_profile = command.get("user_profile")
-                    user_role = command.get("role", "user")
-
                     if is_architect_mode:
                         architect_difficulty = command.get("architect_difficulty", "curious_kid")
                         chat_response, math_board, diagram_board, simulation_board, teaching_score = await architect_ops.handle_architect_query(
@@ -378,19 +368,17 @@ async def jarvis_processing_loop():
                             user_id=user_id
                         )
                     
-                    await manager.broadcast({"type": "professor_thinking", "is_thinking": False, "session_id": session_id, "user_id": user_id})
+                    await manager.broadcast({"type": "professor_thinking", "is_thinking": False})
                     
-                    role = "young_jarvis" if is_architect_mode else "jarvis"
-                    await manager.broadcast({"type": "professor_chat", "role": role, "message": chat_response, "teaching_score": teaching_score, "session_id": session_id, "user_id": user_id})
+                    chat_role = "young_jarvis" if is_architect_mode else "jarvis"
+                    await manager.broadcast({"type": "professor_chat", "role": chat_role, "message": chat_response, "teaching_score": teaching_score})
                     
                     if math_board:
                         await manager.broadcast({
                             "type": "blackboard_widget",
                             "widget_type": "math",
                             "id": str(uuid.uuid4()),
-                            "content": math_board,
-                            "session_id": session_id,
-                            "user_id": user_id
+                            "content": math_board
                         })
                         
                     if diagram_board:
@@ -398,9 +386,7 @@ async def jarvis_processing_loop():
                             "type": "blackboard_widget",
                             "widget_type": "diagram",
                             "id": str(uuid.uuid4()),
-                            "content": diagram_board,
-                            "session_id": session_id,
-                            "user_id": user_id
+                            "content": diagram_board
                         })
                     
                     # If a graph was requested, silently route it to The Swarm Physics Engine
@@ -412,22 +398,20 @@ async def jarvis_processing_loop():
                                 "type": "blackboard_widget",
                                 "widget_type": "simulation",
                                 "id": str(uuid.uuid4()),
-                                "content": result_url,
-                                "session_id": session_id,
-                                "user_id": user_id
+                                "content": result_url
                             })
                         else:
-                            await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": f"[System: Simulation failed - {result_url}]", "session_id": session_id, "user_id": user_id})
+                            await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": f"[System: Simulation failed - {result_url}]"})
                             
-                # Refresh sessions list so auto-titling updates the sidebar immediately (ALL branches)
-                mode_for_refresh = "architect" if command.get("is_architect_mode") else ("sandbox" if is_sandbox_mode else ("study_group" if is_study_group else "professor"))
-                sessions = await professor_ops.cloud_engine.fetch_all_sessions(mode=mode_for_refresh, user_id=user_id)
-                await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions, "user_id": user_id, "mode": mode_for_refresh})
+                    # Refresh sessions list so auto-titling updates the sidebar immediately
+                    mode_for_refresh = "architect" if is_architect_mode else ("sandbox" if is_sandbox_mode else ("study_group" if is_study_group else "professor"))
+                    sessions = await professor_ops.cloud_engine.fetch_all_sessions(mode=mode_for_refresh, user_id=user_id)
+                    await manager.broadcast({"type": "professor_sessions_loaded", "sessions": sessions})
                         
             except Exception as e:
-                await manager.broadcast({"type": "professor_thinking", "is_thinking": False, "session_id": session_id, "user_id": user_id})
+                await manager.broadcast({"type": "professor_thinking", "is_thinking": False})
                 print(f"[Professor Engine Error]: {e}")
-                await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": f"[System Error]: {e}", "session_id": session_id, "user_id": user_id})
+                await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": f"[System Error]: {e}"})
                 
             await manager.broadcast({"type": "state", "state": "sleeping", "main_text": "System Standby", "sub_text": "Awaiting directive..."})
             continue
@@ -436,21 +420,23 @@ async def jarvis_processing_loop():
         if not user_text:
             continue
             
-        await manager.broadcast({"type": "chat", "role": "You", "message": user_text, "user_id": user_key})
+        effective_user_id = user_id or "guest_local"
+        user_hist = user_conversations.setdefault(effective_user_id, [])
+
+        await manager.broadcast({"type": "chat", "role": "You", "message": user_text})
         
         # 3. CORE PROCESSING (Standard)
         await manager.broadcast({"type": "state", "state": "thinking", "main_text": "Processing", "sub_text": "Accessing Neural Network"})
         
         # 3. THINKING
-        user_profile = command.get("user_profile")
-        user_role = command.get("role", "user")
-        user_id = command.get("user_id")
-        user_key = user_id or ("admin_master" if user_role == "admin" else "guest_local")
-        if user_key not in user_conversation_histories:
-            user_conversation_histories[user_key] = []
-        user_history = user_conversation_histories[user_key]
-
-        response_text, tool_calls = await brain.think(user_text, user_history, input_type=input_type, user_profile=user_profile, role=user_role, user_id=user_id)
+        response_text, tool_calls = await brain.think(
+            user_text, 
+            user_hist, 
+            input_type=input_type, 
+            user_profile=user_profile, 
+            role=user_role,
+            user_id=effective_user_id
+        )
         
         # 4. EXECUTING
         if tool_calls:
@@ -541,19 +527,9 @@ async def jarvis_processing_loop():
                 
                 # --- STARK HUD TOOL ---
                 elif name == "toggle_stark_hud":
-                    state = args.get("state", "on")
-                    productivity.toggle_stark_hud(state)
-                    response_text = f"Stark HUD resource overlay has been turned {state}."
-
-                # --- MEMORY TOOL ---
-                elif name == "store_new_memory":
-                    fact = args.get("fact", "")
-                    if fact:
-                        if brain.memory_manager.add_fact(fact):
-                            response_text = f"I have permanently committed that to my core memory files, sir: '{fact}'."
-                        else:
-                            response_text = f"I already have that recorded in my memory banks, sir."
-
+                    await manager.broadcast({"type": "hud_toggle", "state": args.get("state", "on")})
+                    response_text = f"I have turned the Stark HUD {args.get('state', 'on')}, sir."
+                
                 # --- DATA VISUALIZATION ---
                 elif name == "create_interactive_dashboard":
                     await manager.broadcast({
@@ -572,7 +548,7 @@ async def jarvis_processing_loop():
                 elif name == "simulate_physics":
                     await manager.broadcast({"type": "state", "state": "executing", "main_text": "Physics Engine Online", "sub_text": "Calculating topological matrices..."})
                     result_url = await physics_ops.simulate_physics(args.get("prompt", ""))
-                    if result_url.startswith("http"):
+                    if result_url.startswith("http") or result_url.startswith("/"):
                         await manager.broadcast({
                             "type": "html_view",
                             "html_url": result_url
@@ -586,13 +562,12 @@ async def jarvis_processing_loop():
                 elif name == "delegate_to_deep_think_core":
                     await manager.broadcast({"type": "state", "state": "executing", "main_text": "Deep Think Engaged", "sub_text": "Routing to Gemini Core..."})
                     
-                    # Temporarily force Gemini for this prompt
                     from openai import AsyncOpenAI
                     import config
                     gemini_client = AsyncOpenAI(api_key=config.GEMINI_API_KEY, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
                     
                     messages = [{"role": "system", "content": "You are J.A.R.V.I.S Deep Think Core (Gemini). Solve this complex problem brilliantly."}]
-                    messages.extend(user_history)
+                    messages.extend(user_hist)
                     messages.append({"role": "user", "content": args.get("task_description", "")})
                     
                     try:
@@ -612,24 +587,24 @@ async def jarvis_processing_loop():
                     )
                     response_text, _ = await brain.think(
                         follow_up_prompt, 
-                        user_history, 
+                        user_hist, 
                         use_tools=False,
                         input_type=input_type,
                         user_profile=user_profile,
                         role=user_role,
-                        user_id=user_id
+                        user_id=effective_user_id
                     )
         
         if not response_text:
             response_text = "Task executed successfully, sir."
         
-        user_history.append({"role": "user", "content": user_text})
-        user_history.append({"role": "assistant", "content": response_text})
+        user_hist.append({"role": "user", "content": user_text})
+        user_hist.append({"role": "assistant", "content": response_text})
         
-        if len(user_history) > MAX_CHAT_HISTORY:
-            user_conversation_histories[user_key] = user_history[-MAX_CHAT_HISTORY:]
+        if len(user_hist) > MAX_CHAT_HISTORY:
+            user_conversations[effective_user_id] = user_hist[-MAX_CHAT_HISTORY:]
         
-        await manager.broadcast({"type": "chat", "role": "Jarvis", "message": response_text, "user_id": user_key})
+        await manager.broadcast({"type": "chat", "role": "Jarvis", "message": response_text})
         
         # 5. SPEAKING (Only if input was Voice)
         if input_type == "voice":
@@ -644,13 +619,11 @@ async def jarvis_processing_loop():
 async def lifespan(app: FastAPI):
     # Startup: Create background tasks
     task1 = asyncio.create_task(jarvis_processing_loop())
-    task2 = asyncio.create_task(audio_listener_loop())
     task3 = asyncio.create_task(telemetry_loop())
     task4 = asyncio.create_task(cleanup_loop())
     yield
     # Shutdown: Cancel tasks
     task1.cancel()
-    task2.cancel()
     task3.cancel()
     task4.cancel()
 
@@ -740,14 +713,18 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             try:
                 msg = json.loads(data)
+                user_id = msg.get("user_id")
+                role = msg.get("role", "user")
+                user_profile = msg.get("user_profile")
+
                 if msg.get("type") == "text_command":
                     # Send text input to the queue
                     await input_queue.put({
                         "type": "text", 
                         "text": msg.get("text"),
-                        "user_profile": msg.get("user_profile"),
-                        "role": msg.get("role", "user"),
-                        "user_id": msg.get("user_id")
+                        "user_id": user_id,
+                        "role": role,
+                        "user_profile": user_profile
                     })
                 elif msg.get("type") == "system_command":
                     await input_queue.put({"type": "system_command", "action": msg.get("action")})
@@ -766,9 +743,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         "architect_difficulty": msg.get("architect_difficulty", "curious_kid"),
                         "is_epiphany_mode": msg.get("is_epiphany_mode", False),
                         "is_collider_mode": msg.get("is_collider_mode", False),
-                        "user_profile": msg.get("user_profile"),
-                        "role": msg.get("role", "user"),
-                        "user_id": msg.get("user_id")
+                        "user_id": user_id,
+                        "role": role,
+                        "user_profile": user_profile
                     })
                 elif msg.get("type") == "fractal_expand":
                     await input_queue.put({
@@ -785,13 +762,18 @@ async def websocket_endpoint(websocket: WebSocket):
                         "mode": msg.get("mode", "professor"),
                         "media_id": msg.get("media_id"),
                         "file": msg.get("file"),
-                        "user_id": msg.get("user_id"),
-                        "role": msg.get("role", "user")
+                        "user_id": user_id,
+                        "role": role,
+                        "user_profile": user_profile
                     })
                 elif msg.get("type") == "curiosity_feed_request":
+                    interested_subjects = msg.get("interested_subjects")
+                    if not interested_subjects and user_profile:
+                        interested_subjects = user_profile.get("interested_subjects")
+                    language = msg.get("language") or (user_profile.get("language") if user_profile else "English")
                     hooks = await curiosity_engine.generate_curiosity_feed(
-                        interested_subjects=msg.get("interested_subjects"),
-                        language=msg.get("language", "English")
+                        interested_subjects=interested_subjects,
+                        language=language
                     )
                     try:
                         await websocket.send_json({"type": "curiosity_feed_response", "hooks": hooks})

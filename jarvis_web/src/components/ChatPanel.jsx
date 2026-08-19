@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { Bot } from 'lucide-react';
+import FormattedMessage from './FormattedMessage';
 import TeachingScoreCard from './TeachingScoreCard';
 
 const MessageBubble = memo(({ msg, theme, isLast }) => {
@@ -96,7 +97,7 @@ const MessageBubble = memo(({ msg, theme, isLast }) => {
             display: 'flex', 
             alignItems: 'center', 
             gap: '6px', 
-            marginBottom: '4px', 
+            marginBottom: '6px', 
             fontSize: '0.8rem', 
             textTransform: 'uppercase', 
             letterSpacing: '0.06em',
@@ -106,8 +107,8 @@ const MessageBubble = memo(({ msg, theme, isLast }) => {
           {msg.role === 'young_jarvis' && <Bot size={13} />}
           {displayName}
         </strong> 
-        <div style={{ color: isUser ? '#fff' : '#f8fafc', whiteSpace: 'pre-wrap' }}>
-          {msg.message}
+        <div style={{ color: isUser ? '#fff' : '#f8fafc' }}>
+          <FormattedMessage text={msg.message || ''} />
         </div>
         {msg.teaching_score && <TeachingScoreCard score={msg.teaching_score} />}
       </div>

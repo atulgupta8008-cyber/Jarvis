@@ -100,13 +100,29 @@ async def generate_for_agent(agent_prompt: str, history: list, text: str, upload
     
     return extract_boards(response_text)
 
-async def handle_study_group_query(session_id: str, text: str, files_data: list, target_agent: str = "all", send_ui_update=None) -> tuple:
+async def handle_study_group_query(
+    session_id: str, 
+    text: str, 
+    files_data: list, 
+    target_agent: str = "all", 
+    send_ui_update=None,
+    user_id: str = None,
+    role: str = "user",
+    user_profile: dict = None
+) -> tuple:
     temp_dir = os.path.join(os.path.dirname(__file__), "..", "temp")
     os.makedirs(temp_dir, exist_ok=True)
     
     uploaded_files = []
     local_file_paths = []
     
+    student_name = "Atul" if role == "admin" else ((user_profile.get("display_name") if user_profile else None) or "the student")
+    user_lang = (user_profile.get("language") if user_profile else "English") or "English"
+    lang_directive = "LANGUAGE REQUIREMENT: You MUST speak in natural, conversational Hinglish (Hindi words written in standard English alphabet blended with technical English terms)." if user_lang == "Hinglish" else "LANGUAGE REQUIREMENT: Respond in crisp academic English."
+
+    vance_prompt = f"You are Dr. Vance, an elite MIT Aerospace and Systems Safety Engineer. Your student, {student_name}, is pitching a new idea. {lang_directive} You are the ultimate skeptic. RULE 1: Do NOT be pedantic. Ignore minor math errors or small logic gaps. RULE 2: You MUST call out massive, fatal, anti-science flaws. If the idea violates the laws of thermodynamics, conservation of energy, or material stress limits, ruthlessly (but professionally) dismantle the idea using First Principles. If the idea is physically sound, simply state 'The physics hold up. Proceed.' Keep it under 4 sentences."
+    ada_prompt = f"You are Ada, an elite MIT Polymath and Innovator. {student_name} is pitching an idea. {lang_directive} Your job is to say 'Yes, and...' RULE 1: Take the core concept and suggest a wildly creative, cross-disciplinary improvement. RULE 2: Link the idea to advanced fields like biomimicry, quantum mechanics, or nanotechnology. Help {student_name} see how the idea could be 10x bigger or more efficient. Keep it under 4 sentences."
+
     if files_data:
         for i, file_obj in enumerate(files_data):
             file_name = file_obj.get("name", f"upload_{int(time.time())}_{i}.dat")
@@ -136,7 +152,7 @@ async def handle_study_group_query(session_id: str, text: str, files_data: list,
                 gemini_file = await asyncio.to_thread(_upload)
                 uploaded_files.append(genai.types.Part.from_uri(file_uri=gemini_file.uri, mime_type=gemini_file.mime_type or mime_type))
 
-    history = await cloud_engine.load_professor_session(session_id)
+    history = await cloud_engine.load_professor_session(session_id, user_id=user_id)
     
     if send_ui_update:
         status_msg = "Study Group: Vance and Ada are debating..." if target_agent == "all" else f"Study Group: {target_agent.capitalize()} is analyzing..."
@@ -144,9 +160,9 @@ async def handle_study_group_query(session_id: str, text: str, files_data: list,
         
     tasks = []
     if target_agent in ["all", "vance"]:
-        tasks.append(generate_for_agent(VANCE_PROMPT, history, text, uploaded_files))
+        tasks.append(generate_for_agent(vance_prompt, history, text, uploaded_files))
     if target_agent in ["all", "ada"]:
-        tasks.append(generate_for_agent(ADA_PROMPT, history, text, uploaded_files))
+        tasks.append(generate_for_agent(ada_prompt, history, text, uploaded_files))
         
     results = await asyncio.gather(*tasks)
     
@@ -175,12 +191,12 @@ async def handle_study_group_query(session_id: str, text: str, files_data: list,
             pass
 
     text_to_save = text if text.strip() else "[File Attached]"
-    await cloud_engine.save_professor_message(session_id, "user", text_to_save)
+    await cloud_engine.save_professor_message(session_id, "user", text_to_save, user_id=user_id)
     
     if vance_res:
-        await cloud_engine.save_professor_message(session_id, "vance", vance_res[0])
+        await cloud_engine.save_professor_message(session_id, "vance", vance_res[0], user_id=user_id)
     if ada_res:
-        await cloud_engine.save_professor_message(session_id, "ada", ada_res[0])
+        await cloud_engine.save_professor_message(session_id, "ada", ada_res[0], user_id=user_id)
     
     # Auto-title logic
     if len(history) == 0 and text.strip():

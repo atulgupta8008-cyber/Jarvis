@@ -8,6 +8,8 @@ import SessionMediaModal from './SessionMediaModal';
 import { exportKnowledgeCapsule } from '../utils/exportKnowledgeCapsule';
 import { WS_URL } from '../config';
 
+import { useAuth } from '../context/AuthContext';
+
 function addChildToNode(node, targetId, child) {
   if (node.id === targetId) return { ...node, children: [...(node.children || []), child], loadingVariable: null };
   return node.children?.length
@@ -23,6 +25,7 @@ function setNodeLoading(node, targetId, variable) {
 }
 
 export default function ProfessorMode({ onExit, initialQuestion, curiosityQuestion }) {
+  const { user, profile, isAdmin } = useAuth();
   const [chatHistory, setChatHistory] = useState([]);
   const [blackboardWidgets, setBlackboardWidgets] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -39,16 +42,33 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
   const pendingQuestion = useRef(questionToAsk);
   const hasDispatchedQuestion = useRef(false);
 
+  const myUserId = user?.id || (isAdmin ? 'admin_master' : 'guest_local');
+
   useEffect(() => {
     ws.current = new WebSocket(WS_URL);
     ws.current.onopen = () => {
-      ws.current.send(JSON.stringify({ type: 'professor_fetch_sessions', mode: 'professor' }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_fetch_sessions', 
+        mode: 'professor',
+        user_id: myUserId,
+        role: isAdmin ? 'admin' : 'user'
+      }));
       ws.current.send(JSON.stringify({ type: 'system_command', action: 'pause_voice_agent' }));
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'professor' }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_create_session', 
+        mode: 'professor',
+        user_id: myUserId,
+        role: isAdmin ? 'admin' : 'user'
+      }));
     };
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        
+        // Strict ownership check: reject any message tagged for a different account
+        const isMyMessage = !data.user_id || data.user_id === myUserId;
+        if (!isMyMessage) return;
+
         if (data.type === 'professor_stream_chunk') {
           setChatHistory((history) => {
             const next = [...history];
@@ -63,35 +83,42 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
           if (act) setCurrentAct(Number(act[1]));
           const message = data.message.replace(/\[ACT:\d\]/g, '').trim();
           setChatHistory((history) => [...history.filter((item) => !item.isStreaming), { role: data.role, message }]);
-        } else if (data.type === 'professor_history_loaded' && data.history) {
+        } else if (data.type === 'professor_history_loaded') {
           setResearchStatus('');
-          setChatHistory(data.history.map((item) => ({ role: item.role === 'jarvis' ? 'jarvis' : 'user', message: item.content })));
+          if (data.history) {
+            setChatHistory(data.history.map((item) => ({ role: item.role === 'jarvis' ? 'jarvis' : 'user', message: item.content })));
+          }
         } else if (data.type === 'professor_sessions_loaded') {
-          setSessions(data.sessions || []);
+          if (data.mode === 'professor') {
+            setSessions(data.sessions || []);
+          }
         } else if (data.type === 'professor_media_loaded') {
           setSessionMedia(data.media || []);
         } else if (data.type === 'professor_session_created') {
-          setActiveSessionId(data.session_id);
-          setResearchStatus('');
-          setChatHistory([]);
-          setBlackboardWidgets([]);
-          setSessionMedia([]);
-          // Fetch media for this fresh session
-          ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: data.session_id }));
-          
-          // Send initial curiosity question EXACTLY ONCE
-          if (pendingQuestion.current && !hasDispatchedQuestion.current) {
-            hasDispatchedQuestion.current = true;
-            const q = pendingQuestion.current;
-            pendingQuestion.current = null;
-            ws.current.send(JSON.stringify({ 
-              type: 'professor_query', 
-              text: q, 
-              files: [], 
-              session_id: data.session_id,
-              deep_research: false 
-            }));
-            setChatHistory([{ role: 'user', message: q }]);
+          if (data.mode === 'professor') {
+            setActiveSessionId(data.session_id);
+            setResearchStatus('');
+            setChatHistory([]);
+            setBlackboardWidgets([]);
+            setSessionMedia([]);
+            // Fetch media for this fresh session
+            ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: data.session_id, user_id: myUserId }));
+            
+            // Send initial curiosity question EXACTLY ONCE
+            if (pendingQuestion.current && !hasDispatchedQuestion.current) {
+              hasDispatchedQuestion.current = true;
+              const q = pendingQuestion.current;
+              pendingQuestion.current = null;
+              ws.current.send(JSON.stringify({ 
+                type: 'professor_query', 
+                text: q, 
+                session_id: data.session_id, 
+                user_profile: profile,
+                role: isAdmin ? 'admin' : 'user',
+                user_id: myUserId 
+              }));
+              setChatHistory([{ role: 'user', message: q }]);
+            }
           }
         } else if (data.type === 'blackboard_widget') {
           setBlackboardWidgets((widgets) => [...widgets, { id: data.id, type: data.widget_type, content: data.content, minimized: false }]);
@@ -123,19 +150,26 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
       if (ws.current?.readyState === WebSocket.OPEN) ws.current.send(JSON.stringify({ type: 'system_command', action: 'resume_voice_agent' }));
       ws.current?.close();
     };
-  }, []);
+  }, [myUserId]);
 
   const send = (payload) => {
     if (ws.current?.readyState !== WebSocket.OPEN || !activeSessionId) return;
     setResearchStatus('');
-    ws.current.send(JSON.stringify({ type: 'professor_query', session_id: activeSessionId, ...payload }));
+    ws.current.send(JSON.stringify({ 
+      type: 'professor_query', 
+      session_id: activeSessionId, 
+      user_profile: profile,
+      role: isAdmin ? 'admin' : 'user',
+      user_id: myUserId,
+      ...payload 
+    }));
     setChatHistory((history) => [...history, { role: 'user', message: payload.text || '[File attached]' }]);
   };
 
   const createSession = () => {
     setResearchStatus('');
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'professor' }));
+      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'professor', user_id: myUserId }));
     }
   };
 
@@ -146,12 +180,12 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
     setSessionMedia([]);
     setIsSessionsOpen(false);
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'professor_load_history', session_id: id, mode: 'professor' }));
-      ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: id }));
+      ws.current.send(JSON.stringify({ type: 'professor_load_history', session_id: id, mode: 'professor', user_id: myUserId }));
+      ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: id, user_id: myUserId }));
     }
   };
 
-  const deleteSession = (id) => ws.current?.readyState === WebSocket.OPEN && ws.current.send(JSON.stringify({ type: 'professor_delete_session', session_id: id, mode: 'professor' }));
+  const deleteSession = (id) => ws.current?.readyState === WebSocket.OPEN && ws.current.send(JSON.stringify({ type: 'professor_delete_session', session_id: id, mode: 'professor', user_id: myUserId }));
   
   const handleUploadMedia = (fileObj) => {
     if (ws.current?.readyState === WebSocket.OPEN && activeSessionId) {
