@@ -30,7 +30,7 @@ export default defineConfig({
             if (id.includes('framer-motion') || id.includes('lucide-react')) {
               return 'ui-vendor';
             }
-            if (id.includes('react') || id.includes('react-dom') || id.includes('axios')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('axios') || id.includes('@supabase')) {
               return 'react-vendor';
             }
             return 'other-vendor';
