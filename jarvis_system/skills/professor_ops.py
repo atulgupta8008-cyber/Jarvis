@@ -190,7 +190,7 @@ async def handle_professor_query(
             subs = ", ".join(user_profile.get("interested_subjects", ["Physics", "Mathematics"])) if isinstance(user_profile.get("interested_subjects"), list) else str(user_profile.get("interested_subjects", ""))
             system_guardrails += f"\n\n[ACTIVE LEARNER: Name: {name} | Preferred Language: {user_lang} | Subject Interests: {subs}]"
 
-        system_guardrails += "\n\nSTRICT OUTPUT CONSTRAINT:\n1. Use the <math_board>...</math_board> tag exclusively for long, multi-step calculus or derivations written in standard LaTeX.\n2. Use the <diagram_board>...</diagram_board> tag exclusively for free-body diagrams, system architectures, or flowcharts written in Mermaid.js syntax.\n3. Use the <simulation_board>...</simulation_board> tag exclusively to prompt the physics engine to generate a 3D visualization using Plotly/Three.js.\n\nThink deeply. Provide exhaustive, step-by-step derivations on the blackboard. Use simulations liberally to demonstrate complex systems. Never use these tags for normal conversation."
+        system_guardrails += "\n\nSTRICT OUTPUT CONSTRAINT:\n1. Use the <math_board>...</math_board> tag exclusively for pure, valid LaTeX equations and multi-step derivations (use \\begin{aligned} ... \\end{aligned} for multi-line derivations). Wrap any explanatory step titles inside \\text{Step 1: ...}. NEVER write plain unescaped English sentences or numbered lists outside \\text{} inside <math_board>.\n2. Use the <diagram_board>...</diagram_board> tag exclusively for free-body diagrams, system architectures, or flowcharts written in Mermaid.js syntax.\n3. Use the <simulation_board>...</simulation_board> tag exclusively to prompt the physics engine to generate a 3D visualization using Plotly/Three.js.\n\nThink deeply. Provide exhaustive, step-by-step derivations on the blackboard. Use simulations liberally to demonstrate complex systems. Never use these tags for normal conversation."
 
         if media_filenames:
             system_guardrails += f"\n\n[SESSION MEDIA VAULT: The student has uploaded the following course materials/PDFs for this session: {', '.join(media_filenames)}. Use these specific documents to guide your Socratic explanations, problems, and derivations whenever relevant.]"
@@ -345,17 +345,13 @@ async def handle_fractal_expand(context: str, target_variable: str) -> dict:
     import json
     
     prompt = f"""SYSTEM OVERRIDE: FRACTAL DESCENT ENGAGED.
-The user is looking at the concept of '{context}'. They have clicked on the specific variable '{target_variable}' to understand WHY it exists.
+The user is inspecting the equation or concept: '{context}'.
+They clicked on the variable '{target_variable}' to understand its deeper mathematical and physical origin.
 
-RULE 1 (The Descent): You must go exactly ONE layer deeper into fundamental physics or mathematics.
-
-RULE 2 (The Output): Output strict JSON containing two fields:
-"equation": The formula that defines the target variable (in LaTeX).
-"explanation": A 1-sentence, razor-sharp explanation of what this deeper layer means.
-
-RULE 3 (No Chat): Do NOT output conversational text. Output ONLY the JSON payload.
-
-RULE 4 (JSON Escaping): You MUST double-escape all LaTeX backslashes in your JSON output so it parses correctly. For example, write "\\\\frac{{1}}{{2}}" instead of "\\frac{{1}}{{2}}", and "\\\\int" instead of "\\int".
+RULE 1 (The Descent): You must derive or define '{target_variable}' in terms of more fundamental first-principles quantities or laws.
+RULE 2 (Pure LaTeX Equation): The "equation" field MUST be a clean, valid LaTeX expression (e.g. "{target_variable} = m \\cdot v" or "{target_variable} = \\frac{{dp}}{{dt}}" or "{target_variable} = \\frac{{h}}{{p}}"). Do NOT put conversational English text inside the equation field.
+RULE 3 (Crisp Explanation): The "explanation" field must be a single razor-sharp sentence explaining the physical meaning.
+RULE 4 (JSON Escaping): Output strict JSON with keys "equation" and "explanation". Double-escape all backslashes (e.g. "\\\\frac{{h}}{{p}}").
 """
 
     try:
