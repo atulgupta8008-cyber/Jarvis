@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Shield, User, Lock, Mail, ArrowRight, X, KeyRound, CheckCircle, Compass } from 'lucide-react';
+import { Sparkles, Shield, User, Lock, Mail, ArrowRight, X, KeyRound, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthModal({ isOpen, onClose }) {
-  const { signIn, signUp, signInAdmin, continueAsGuest, showAuthModal, setShowAuthModal } = useAuth();
+  const { signIn, signUp, signInAdmin, showAuthModal, setShowAuthModal } = useAuth();
   const activeIsOpen = isOpen !== undefined ? isOpen : showAuthModal;
   const handleClose = onClose || (() => setShowAuthModal(false));
 
@@ -408,27 +408,6 @@ export default function AuthModal({ isOpen, onClose }) {
             )}
           </button>
         </form>
-
-        {/* Continue as Guest option */}
-        <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <button 
-            type="button"
-            onClick={continueAsGuest}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#8994ad',
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <Compass size={13} /> Or continue as Guest Explorer (No account needed)
-          </button>
-        </div>
       </motion.div>
     </div>
   );

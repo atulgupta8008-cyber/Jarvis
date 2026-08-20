@@ -439,7 +439,7 @@ async def jarvis_processing_loop():
         user_profile = command.get("user_profile")
         user_role = command.get("role", "user")
         user_id = command.get("user_id")
-        user_key = user_id or ("admin_master" if user_role == "admin" else "guest_local")
+        user_key = user_id or ("admin_master" if user_role == "admin" else "user_default")
 
         await manager.broadcast({"type": "chat", "role": "You", "message": user_text, "user_id": user_key})
         

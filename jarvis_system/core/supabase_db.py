@@ -78,8 +78,8 @@ class SocraticCloudEngine:
         return await asyncio.to_thread(_fetch)
 
     def _clean_user_id(self, user_id: str) -> str:
-        if not user_id or user_id in ["guest", "guest_local", "null", "undefined"] or str(user_id).startswith("guest_"):
-            return "guest_local"
+        if not user_id or str(user_id).strip() in ["", "null", "undefined", "guest", "guest_local"]:
+            return "user_default"
         if user_id in ["admin", "admin_master"]:
             return "admin_master"
         return str(user_id).strip()
@@ -206,7 +206,7 @@ class SocraticCloudEngine:
                     "id": new_id,
                     "session_title": initial_title, 
                     "mode": mode,
-                    "user_id": effective_user if effective_user != "guest_local" else None
+                    "user_id": effective_user
                 }
                 res = self.client.table("chat_sessions").insert(payload).execute()
                 if res.data:
@@ -233,11 +233,7 @@ class SocraticCloudEngine:
         def _get_or_create():
             if not self.client: return None
             try:
-                query = self.client.table("chat_sessions").select("id").eq("mode", mode)
-                if effective_user != "guest_local":
-                    query = query.eq("user_id", effective_user)
-                else:
-                    query = query.or_("user_id.eq.guest_local,user_id.is.null")
+                query = self.client.table("chat_sessions").select("id").eq("mode", mode).eq("user_id", effective_user)
                 res = query.order("created_at", desc=True).limit(1).execute()
                 
                 if res.data and len(res.data) > 0:
@@ -262,11 +258,7 @@ class SocraticCloudEngine:
         def _fetch():
             if not self.client: return None
             try:
-                query = self.client.table("chat_sessions").select("id, session_title, created_at, user_id, chat_messages(id)").eq("mode", mode)
-                if effective_user != "guest_local":
-                    query = query.eq("user_id", effective_user)
-                else:
-                    query = query.or_("user_id.eq.guest_local,user_id.is.null,user_id.ilike.guest_%")
+                query = self.client.table("chat_sessions").select("id, session_title, created_at, user_id, chat_messages(id)").eq("mode", mode).eq("user_id", effective_user)
                 res = query.order("created_at", desc=True).execute()
                 if res.data is not None:
                     # Keep only sessions that have at least 1 message

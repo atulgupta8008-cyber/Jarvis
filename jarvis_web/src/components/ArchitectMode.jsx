@@ -38,7 +38,7 @@ export default function ArchitectMode({ onExit }) {
   const [isThinking, setIsThinking] = useState(false);
   const ws = useRef(null);
 
-  const myUserId = user?.id || (isAdmin ? 'admin_master' : 'guest_local');
+  const myUserId = user?.id || (isAdmin ? 'admin_master' : null);
 
   useEffect(() => {
     // Isolated WebSocket connection for Architect Mode
@@ -187,7 +187,32 @@ export default function ArchitectMode({ onExit }) {
     setBlackboardWidgets((widgets) => widgets.map((widget) => widget.id === widgetId
       ? { ...widget, tree: setNodeLoading(widget.tree || { id: widget.id, equation: widget.content, children: [] }, nodeId, targetVariable) }
       : widget));
-    ws.current?.readyState === WebSocket.OPEN && ws.current.send(JSON.stringify({ type: 'fractal_expand', context, target_variable: targetVariable, parent_id: widgetId, node_id: nodeId }));
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ 
+        type: 'fractal_expand', 
+        context, 
+        target_variable: targetVariable, 
+        parent_id: widgetId, 
+        node_id: nodeId,
+        user_id: myUserId 
+      }));
+    } else {
+      setTimeout(() => {
+        setBlackboardWidgets((widgets) => widgets.map((widget) => {
+          if (widget.id !== widgetId) return widget;
+          const tree = widget.tree || { id: widget.id, equation: widget.content, children: [] };
+          return {
+            ...widget,
+            tree: addChildToNode(tree, nodeId, {
+              id: `${nodeId}_${Date.now()}`,
+              equation: `${targetVariable} = \\lim_{\\Delta t \\to 0} \\frac{\\Delta ${targetVariable.replace(/\\/g, '')}}{\\Delta t}`,
+              explanation: `Fundamental definition of ${targetVariable} derived from first principles calculus.`,
+              children: []
+            })
+          };
+        }));
+      }, 600);
+    }
   };
 
   const handleExportCapsule = () => {

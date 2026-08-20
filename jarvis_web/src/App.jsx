@@ -91,7 +91,7 @@ const getTitleFromMode = (mode) => {
 };
 
 function AppContent() {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, loading, showAuthModal, setShowAuthModal } = useAuth();
   const [state, setState] = useState({
     status: 'sleeping',
     mainText: 'System Standby',
@@ -111,6 +111,7 @@ function AppContent() {
   const [curiosityHooks, setCuriosityHooks] = useState(DEFAULT_CURIOSITY_HOOKS);
   const [isCuriosityDashboardOpen, setIsCuriosityDashboardOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState('chat');
+  const [pendingIntent, setPendingIntent] = useState(null); // { mode, question }
   const ws = useRef(null);
 
   const applyRoute = (mode, question = null, pushState = true) => {
@@ -137,21 +138,54 @@ function AppContent() {
   useEffect(() => {
     const route = getModeFromPath(window.location.pathname, window.location.search);
     if (route.isProfile) {
-      setIsProfileOpen(true);
+      if (!user) {
+        setShowAuthModal(true);
+        applyRoute('nexus', null, false);
+      } else {
+        setIsProfileOpen(true);
+        applyRoute(route.mode, route.question, false);
+      }
+    } else {
+      applyRoute(route.mode, route.question, false);
     }
-    applyRoute(route.mode, route.question, false);
 
     const onPopState = () => {
       const currentRoute = getModeFromPath(window.location.pathname, window.location.search);
       if (currentRoute.isProfile) {
-        setIsProfileOpen(true);
+        if (!user) {
+          setShowAuthModal(true);
+          applyRoute('nexus', null, false);
+        } else {
+          setIsProfileOpen(true);
+          applyRoute(currentRoute.mode, currentRoute.question, false);
+        }
+      } else {
+        applyRoute(currentRoute.mode, currentRoute.question, false);
       }
-      applyRoute(currentRoute.mode, currentRoute.question, false);
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  // When unauthenticated user tries to access protected modes directly, redirect to nexus and prompt login
+  useEffect(() => {
+    if (!loading && !user) {
+      const isAnyModeActive = isProfessorModeActive || isStudyGroupModeActive || isArchitectModeActive || isSandboxModeActive || (!isNexusHubActive && !isCuriosityDashboardOpen);
+      if (isAnyModeActive) {
+        setShowAuthModal(true);
+        applyRoute('nexus', null, false);
+      }
+    }
+  }, [loading, user, isProfessorModeActive, isStudyGroupModeActive, isArchitectModeActive, isSandboxModeActive, isNexusHubActive, isCuriosityDashboardOpen]);
+
+  // When user successfully authenticates and had a pending mode clicked, seamlessly enter that mode
+  useEffect(() => {
+    if (user && pendingIntent) {
+      applyRoute(pendingIntent.mode, pendingIntent.question, true);
+      setPendingIntent(null);
+    }
+  }, [user, pendingIntent]);
 
   const userRef = useRef(user);
   userRef.current = user;
@@ -162,6 +196,14 @@ function AppContent() {
   useEffect(() => {
     setChatHistory([]);
     setDashboardData(null);
+    if (!user) {
+      setIsProfessorModeActive(false);
+      setIsStudyGroupModeActive(false);
+      setIsArchitectModeActive(false);
+      setIsSandboxModeActive(false);
+      setIsNexusHubActive(true);
+      setIsProfileOpen(false);
+    }
   }, [user?.id, isAdmin]);
 
   // Keep Main WebSocket connection alive
@@ -200,10 +242,9 @@ function AppContent() {
             } else if (data.type === 'chat') {
               const currentId = userRef.current?.id;
               const currentAdmin = isAdminRef.current;
-              const myUserKey = currentId || (currentAdmin ? 'admin_master' : 'guest_local');
+              const myUserKey = currentId || (currentAdmin ? 'admin_master' : null);
               
-              // Only filter out if explicitly destined for another specific account
-              if (data.user_id && data.user_id !== myUserKey && !(myUserKey === 'guest_local' && data.user_id?.startsWith('guest_'))) {
+              if (!myUserKey || (data.user_id && data.user_id !== myUserKey)) {
                 return;
               }
               
@@ -266,11 +307,29 @@ function AppContent() {
   }, [profile?.interested_subjects, profile?.language, user?.id, isAdmin]);
 
   const handleLaunchMode = (mode) => {
+    if (!user && mode !== 'nexus' && mode !== 'curiosity') {
+      setPendingIntent({ mode, question: null });
+      setShowAuthModal(true);
+      return;
+    }
     applyRoute(mode, null, true);
   };
 
   const handleLaunchCuriosity = (question) => {
+    if (!user) {
+      setPendingIntent({ mode: 'professor', question });
+      setShowAuthModal(true);
+      return;
+    }
     applyRoute('professor', question, true);
+  };
+
+  const handleOpenProfile = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    setIsProfileOpen(true);
   };
 
   const handleReturnToNexus = () => {
@@ -374,7 +433,7 @@ function AppContent() {
             <div className="assistant-header-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => setIsProfileOpen(true)}
+                onClick={handleOpenProfile}
                 title="Profile & Settings"
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
@@ -501,7 +560,7 @@ function AppContent() {
         curiosityHooks={curiosityHooks}
         onOpenCuriosityDashboard={handleOpenCuriosity}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
-        onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenProfile={handleOpenProfile}
         user={user}
         profile={profile}
         isAdmin={isAdmin}

@@ -3,29 +3,15 @@ import { supabase, isSupabaseConfigured } from '../supabaseClient';
 
 const AuthContext = createContext();
 
-const LOCAL_STORAGE_GUEST_ID_KEY = 'jarvis_guest_session_id';
 const LOCAL_STORAGE_ADMIN_KEY = 'jarvis_admin_session';
 const LOCAL_STORAGE_ACTIVE_USER_KEY = 'jarvis_active_user_session';
 
-const getOrCreateGuestId = () => {
-  try {
-    let gid = localStorage.getItem(LOCAL_STORAGE_GUEST_ID_KEY);
-    if (!gid) {
-      gid = 'guest_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
-      localStorage.setItem(LOCAL_STORAGE_GUEST_ID_KEY, gid);
-    }
-    return gid;
-  } catch {
-    return 'guest_local';
-  }
-};
-
 const getProfileStorageKey = (userId) => {
-  return userId ? `jarvis_user_profile_${userId}` : 'jarvis_guest_profile';
+  return userId ? `jarvis_user_profile_${userId}` : 'jarvis_user_profile_default';
 };
 
 const DEFAULT_PROFILE = {
-  display_name: 'Guest Scholar',
+  display_name: 'Scholar',
   language: 'English',
   interested_subjects: ['Physics', 'Mathematics', 'Astrophysics'],
   education_level: 'Undergraduate',
@@ -37,27 +23,28 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
       const savedUser = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_KEY);
-      if (savedUser) return JSON.parse(savedUser);
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.id && !parsed.isGuest && !String(parsed.id).startsWith('guest_')) {
+          return parsed;
+        }
+      }
     } catch {}
-    return {
-      id: getOrCreateGuestId(),
-      email: null,
-      isGuest: true
-    };
+    return null;
   });
 
   const [profile, setProfile] = useState(() => {
     try {
       const activeUser = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_KEY);
       const uid = activeUser ? JSON.parse(activeUser).id : null;
-      const saved = localStorage.getItem(getProfileStorageKey(uid));
-      return saved ? JSON.parse(saved) : { ...DEFAULT_PROFILE };
-    } catch {
-      return { ...DEFAULT_PROFILE };
-    }
+      if (uid && !String(uid).startsWith('guest_')) {
+        const saved = localStorage.getItem(getProfileStorageKey(uid));
+        if (saved) return JSON.parse(saved);
+      }
+    } catch {}
+    return { ...DEFAULT_PROFILE };
   });
 
-  const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -135,7 +122,7 @@ export function AuthProvider({ children }) {
       if (supaProfile) {
         const freshUserProf = {
           ...DEFAULT_PROFILE,
-          ...cachedProfile, // Any locally saved updates take precedence if fresher
+          ...cachedProfile,
           ...supaProfile,
           interested_subjects: Array.isArray(supaProfile.interested_subjects) && supaProfile.interested_subjects.length > 0
             ? supaProfile.interested_subjects 
@@ -153,13 +140,11 @@ export function AuthProvider({ children }) {
           } catch {}
         }
       } else if (cachedProfile) {
-        // Restore from preserved local profile
         const merged = { ...DEFAULT_PROFILE, ...cachedProfile };
         setProfile(merged);
         setIsAdmin(merged.role === 'admin');
         if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(merged));
         if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(merged));
-        // Sync to Supabase table
         try {
           await supabase.from('user_profiles').upsert({
             id: userId,
@@ -169,7 +154,6 @@ export function AuthProvider({ children }) {
           });
         } catch {}
       } else {
-        // Genuinely brand new user: create initial profile
         const initialProfile = {
           id: userId,
           email: cleanEmail,
@@ -206,7 +190,6 @@ export function AuthProvider({ children }) {
         const adminUser = { id: 'admin_master', email: 'atulgupta8008@gmail.com', role: 'admin' };
         setUser(adminUser);
         setIsAdmin(true);
-        setIsGuest(false);
         const cachedAdmin = localStorage.getItem(getProfileStorageKey('admin_master'));
         const adminProf = cachedAdmin ? JSON.parse(cachedAdmin) : {
           display_name: 'Atul (Stark Admin)',
@@ -228,7 +211,7 @@ export function AuthProvider({ children }) {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
             setUser(session.user);
-            setIsGuest(false);
+            setIsAdmin(false);
             localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(session.user));
             await fetchSupabaseProfile(session.user.id, session.user.email);
             setLoading(false);
@@ -239,19 +222,25 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // 3. Fallback to Guest
-      const gid = getOrCreateGuestId();
-      const guestUser = { id: gid, email: null, isGuest: true };
-      setUser(guestUser);
-      setIsGuest(true);
-      setIsAdmin(false);
+      // 3. Check active local authenticated user
+      try {
+        const savedUserStr = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_KEY);
+        if (savedUserStr) {
+          const savedUser = JSON.parse(savedUserStr);
+          if (savedUser && savedUser.id && !savedUser.isGuest && !String(savedUser.id).startsWith('guest_')) {
+            setUser(savedUser);
+            setIsAdmin(false);
+            await fetchSupabaseProfile(savedUser.id, savedUser.email);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch {}
 
-      const guestCached = localStorage.getItem(getProfileStorageKey(gid));
-      if (guestCached) {
-        setProfile(JSON.parse(guestCached));
-      } else {
-        setProfile({ ...DEFAULT_PROFILE });
-      }
+      // 4. No authenticated user -> unauthenticated state
+      setUser(null);
+      setIsAdmin(false);
+      setProfile({ ...DEFAULT_PROFILE });
       setLoading(false);
     };
 
@@ -262,7 +251,6 @@ export function AuthProvider({ children }) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
           setUser(session.user);
-          setIsGuest(false);
           setIsAdmin(false);
           localStorage.removeItem(LOCAL_STORAGE_ADMIN_KEY);
           localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(session.user));
@@ -278,27 +266,15 @@ export function AuthProvider({ children }) {
   const handleLocalSignOut = () => {
     localStorage.removeItem(LOCAL_STORAGE_ADMIN_KEY);
     localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_KEY);
-    
-    // Generate fresh isolated guest scope
-    const freshGuestId = 'guest_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
-    localStorage.setItem(LOCAL_STORAGE_GUEST_ID_KEY, freshGuestId);
-    
-    const freshGuestUser = { id: freshGuestId, email: null, isGuest: true };
-    setUser(freshGuestUser);
-    setIsGuest(true);
+    setUser(null);
     setIsAdmin(false);
-
-    // Pristine clean default profile
-    const cleanGuestProfile = { ...DEFAULT_PROFILE };
-    setProfile(cleanGuestProfile);
-    localStorage.setItem(getProfileStorageKey(freshGuestId), JSON.stringify(cleanGuestProfile));
+    setProfile({ ...DEFAULT_PROFILE });
   };
 
   // Sign Up method with Rate Limit Immunity & Direct Profile Sync
   const signUp = async (email, password, displayName) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanName = (displayName || cleanEmail.split('@')[0]).trim();
-    const storageKey = getProfileStorageKey(cleanEmail);
 
     const freshNewProfile = {
       display_name: cleanName,
@@ -311,39 +287,47 @@ export function AuthProvider({ children }) {
     };
 
     if (!isSupabaseConfigured || !supabase) {
-      const guestUser = { id: `user_${Date.now()}`, email: cleanEmail };
-      setUser(guestUser);
-      setIsGuest(false);
+      const deterministicId = `usr_${btoa(cleanEmail).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
+      const localUser = { id: deterministicId, email: cleanEmail };
+      
+      const vault = JSON.parse(localStorage.getItem('jarvis_account_vault') || '{}');
+      vault[cleanEmail] = password;
+      localStorage.setItem('jarvis_account_vault', JSON.stringify(vault));
+
+      const profilesVault = JSON.parse(localStorage.getItem('jarvis_account_profiles') || '{}');
+      profilesVault[cleanEmail] = freshNewProfile;
+      localStorage.setItem('jarvis_account_profiles', JSON.stringify(profilesVault));
+
+      setUser(localUser);
+      setIsAdmin(false);
       setProfile(freshNewProfile);
-      localStorage.setItem(getProfileStorageKey(guestUser.id), JSON.stringify(freshNewProfile));
-      localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(guestUser));
+      localStorage.setItem(getProfileStorageKey(localUser.id), JSON.stringify(freshNewProfile));
+      localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(localUser));
       setShowAuthModal(false);
       setShowSurveyModal(true);
-      return { user: guestUser, error: null };
+      return { data: { user: localUser }, error: null };
     }
 
     try {
       // 0. Pre-check if email already exists in user_profiles
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: existingUsers, error: searchErr } = await supabase
-            .from('user_profiles')
-            .select('id, email')
-            .ilike('email', cleanEmail)
-            .limit(1);
+      try {
+        const { data: existingUsers, error: searchErr } = await supabase
+          .from('user_profiles')
+          .select('id, email')
+          .ilike('email', cleanEmail)
+          .limit(1);
 
-          if (!searchErr && existingUsers && existingUsers.length > 0) {
-            return {
-              data: null,
-              error: {
-                code: 'USER_ALREADY_EXISTS',
-                message: 'An account with this email address is already registered. Please sign in instead.'
-              }
-            };
-          }
-        } catch (checkErr) {
-          console.warn('[AuthContext] Existing user check notice:', checkErr);
+        if (!searchErr && existingUsers && existingUsers.length > 0) {
+          return {
+            data: null,
+            error: {
+              code: 'USER_ALREADY_EXISTS',
+              message: 'An account with this email address is already registered. Please sign in instead.'
+            }
+          };
         }
+      } catch (checkErr) {
+        console.warn('[AuthContext] Existing user check notice:', checkErr);
       }
 
       // Persist to local verified vault
@@ -402,13 +386,12 @@ export function AuthProvider({ children }) {
       }
 
       setUser(resilientUser);
-      setIsGuest(false);
       setIsAdmin(false);
       setProfile(freshNewProfile);
       localStorage.setItem(getProfileStorageKey(resilientUser.id), JSON.stringify(freshNewProfile));
       localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(resilientUser));
       setShowAuthModal(false);
-      setShowSurveyModal(true); // Launch survey
+      setShowSurveyModal(true);
       return { data: { user: resilientUser }, error: null };
     } catch (error) {
       return { data: null, error };
@@ -422,7 +405,6 @@ export function AuthProvider({ children }) {
       const adminUser = { id: 'admin_master', email: 'atulgupta8008@gmail.com', role: 'admin' };
       setUser(adminUser);
       setIsAdmin(true);
-      setIsGuest(false);
       localStorage.setItem(LOCAL_STORAGE_ADMIN_KEY, 'active');
       localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(adminUser));
       
@@ -455,22 +437,55 @@ export function AuthProvider({ children }) {
     if (!isSupabaseConfigured || !supabase) {
       // Local mock credentials check
       const mockAccounts = JSON.parse(localStorage.getItem('jarvis_account_vault') || '{}');
-      if (mockAccounts[cleanEmail] && mockAccounts[cleanEmail] !== cleanPass) {
+      if (!mockAccounts[cleanEmail]) {
+        return { 
+          data: null, 
+          error: { message: 'No account found with this email. Please switch to the Sign Up tab to register.' } 
+        };
+      }
+      if (mockAccounts[cleanEmail] !== cleanPass) {
         return { data: null, error: { message: 'Invalid password. Please check your credentials and try again.' } };
       }
-      mockAccounts[cleanEmail] = cleanPass;
-      localStorage.setItem('jarvis_account_vault', JSON.stringify(mockAccounts));
 
-      const mockUser = { id: `user_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`, email: cleanEmail };
+      const deterministicId = `usr_${btoa(cleanEmail).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
+      const mockUser = { id: deterministicId, email: cleanEmail };
       setUser(mockUser);
-      setIsGuest(false);
+      setIsAdmin(false);
       localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(mockUser));
+      await fetchSupabaseProfile(mockUser.id, cleanEmail);
       setShowAuthModal(false);
       return { data: { user: mockUser }, error: null };
     }
 
     try {
-      // 1. Authenticate with Supabase Auth
+      // 1. Strict Database Verification: Check if account exists in Supabase DB first
+      let dbUserRow = null;
+      try {
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, email')
+          .ilike('email', cleanEmail)
+          .limit(1);
+
+        if (profiles && profiles.length > 0) {
+          dbUserRow = profiles[0];
+        }
+      } catch (dbCheckErr) {
+        console.warn('[AuthContext] Database presence check notice:', dbCheckErr);
+      }
+
+      const vault = JSON.parse(localStorage.getItem('jarvis_account_vault') || '{}');
+      const hasLocalVaultAccount = Boolean(vault[cleanEmail]);
+
+      // If user is neither in database nor in verified local vault, REJECT immediately!
+      if (!dbUserRow && !hasLocalVaultAccount) {
+        return { 
+          data: null, 
+          error: { message: 'No account found with this email. Please switch to the Sign Up tab to register.' } 
+        };
+      }
+
+      // 2. Authenticate with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPass
@@ -478,7 +493,6 @@ export function AuthProvider({ children }) {
 
       if (!error && data?.user) {
         setUser(data.user);
-        setIsGuest(false);
         setIsAdmin(false);
         localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(data.user));
         await fetchSupabaseProfile(data.user.id, data.user.email);
@@ -486,14 +500,12 @@ export function AuthProvider({ children }) {
         return { data, error: null };
       }
 
-      // 2. Check verified account vault if Supabase email confirmation was pending
-      const vault = JSON.parse(localStorage.getItem('jarvis_account_vault') || '{}');
-      if (vault[cleanEmail]) {
+      // 3. Fallback for accounts created with pending confirmation
+      if (hasLocalVaultAccount) {
         if (vault[cleanEmail] === cleanPass) {
-          const deterministicId = `usr_${btoa(cleanEmail).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
+          const deterministicId = dbUserRow?.id || `usr_${btoa(cleanEmail).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
           const verifiedUser = { id: deterministicId, email: cleanEmail };
           setUser(verifiedUser);
-          setIsGuest(false);
           setIsAdmin(false);
           localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(verifiedUser));
           await fetchSupabaseProfile(deterministicId, cleanEmail);
@@ -507,14 +519,8 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // 3. Check if user profile exists in database
-      const { data: profiles } = await supabase
-        .from('user_profiles')
-        .select('id, email')
-        .ilike('email', cleanEmail)
-        .limit(1);
-
-      if (profiles && profiles.length > 0) {
+      // 4. If account exists in database but password didn't match
+      if (dbUserRow) {
         return { 
           data: null, 
           error: { message: 'Invalid password. Please check your credentials and try again.' } 
@@ -528,12 +534,6 @@ export function AuthProvider({ children }) {
     } catch (error) {
       return { data: null, error: { message: error.message || 'Authentication error.' } };
     }
-  };
-
-  // Continue as Guest method (Zero DB Usage)
-  const continueAsGuest = () => {
-    handleLocalSignOut();
-    setShowAuthModal(false);
   };
 
   // Sign Out
@@ -570,7 +570,7 @@ export function AuthProvider({ children }) {
     }
 
     // 3. Save to Supabase DB
-    if (user && !isGuest && isSupabaseConfigured && supabase) {
+    if (user && isSupabaseConfigured && supabase) {
       try {
         await supabase.from('user_profiles').upsert({
           id: user.id,
@@ -588,7 +588,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user,
       profile,
-      isGuest,
+      isAuthenticated: Boolean(user),
       isAdmin,
       loading,
       showAuthModal,
@@ -598,7 +598,6 @@ export function AuthProvider({ children }) {
       signIn,
       signUp,
       signInAdmin,
-      continueAsGuest,
       signOut,
       updateProfile,
       fetchSupabaseProfile

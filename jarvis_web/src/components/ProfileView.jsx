@@ -33,13 +33,9 @@ const LEARNING_STYLES = [
   'Simulation-First'
 ];
 
-export default function ProfileView({ onExit, onClose, onOpenAuth }) {
-  const { user, profile, isGuest, isAdmin, updateProfile, signOut, setShowAuthModal } = useAuth();
+export default function ProfileView({ onExit, onClose }) {
+  const { user, profile, isAdmin, updateProfile, signOut } = useAuth();
   const handleBack = onExit || onClose;
-  const handleOpenAuth = onOpenAuth || (() => {
-    setShowAuthModal(true);
-    handleBack?.();
-  });
 
   const [displayName, setDisplayName] = useState(profile.display_name || 'Scholar');
   const [language, setLanguage] = useState(profile.language || 'English');
@@ -97,45 +93,24 @@ export default function ProfileView({ onExit, onClose, onOpenAuth }) {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {isGuest ? (
-            <button 
-              onClick={handleOpenAuth}
-              style={{
-                background: 'linear-gradient(135deg, #a996ff, #6366f1)',
-                border: 'none',
-                color: '#fff',
-                padding: '8px 16px',
-                borderRadius: 8,
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}
-            >
-              <User size={13} /> Sign In / Create Account
-            </button>
-          ) : (
-            <button 
-              onClick={() => setShowLogoutConfirm(true)}
-              style={{
-                background: 'rgba(255, 99, 132, 0.1)',
-                border: '1px solid rgba(255, 99, 132, 0.25)',
-                color: '#ff9db8',
-                padding: '8px 16px',
-                borderRadius: 8,
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}
-            >
-              <LogOut size={13} /> Sign Out
-            </button>
-          )}
+          <button 
+            onClick={() => setShowLogoutConfirm(true)}
+            style={{
+              background: 'rgba(255, 99, 132, 0.1)',
+              border: '1px solid rgba(255, 99, 132, 0.25)',
+              color: '#ff9db8',
+              padding: '8px 16px',
+              borderRadius: 8,
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <LogOut size={13} /> Sign Out
+          </button>
         </div>
       </header>
 
@@ -150,7 +125,7 @@ export default function ProfileView({ onExit, onClose, onOpenAuth }) {
               style={{
                 background: isAdmin 
                   ? 'linear-gradient(135deg, #ffd165, #f59e0b)' 
-                  : (isGuest ? 'linear-gradient(135deg, #a996ff, #6366f1)' : 'linear-gradient(135deg, #6ef6f7, #3b82f6)')
+                  : 'linear-gradient(135deg, #6ef6f7, #3b82f6)'
               }}
             >
               {isAdmin ? <Shield size={32} /> : (displayName ? displayName.charAt(0).toUpperCase() : 'S')}
@@ -163,16 +138,16 @@ export default function ProfileView({ onExit, onClose, onOpenAuth }) {
                   style={{
                     background: isAdmin 
                       ? 'rgba(255, 209, 101, 0.15)' 
-                      : (isGuest ? 'rgba(169, 150, 255, 0.15)' : 'rgba(52, 211, 153, 0.15)'),
-                    color: isAdmin ? '#ffd165' : (isGuest ? '#a996ff' : '#34d399'),
-                    border: `1px solid ${isAdmin ? 'rgba(255,209,101,0.3)' : (isGuest ? 'rgba(169,150,255,0.3)' : 'rgba(52,211,153,0.3)')}`
+                      : 'rgba(52, 211, 153, 0.15)',
+                    color: isAdmin ? '#ffd165' : '#34d399',
+                    border: `1px solid ${isAdmin ? 'rgba(255,209,101,0.3)' : 'rgba(52,211,153,0.3)'}`
                   }}
                 >
-                  {isAdmin ? 'Stark Admin' : (isGuest ? 'Guest Explorer' : 'Verified Scholar')}
+                  {isAdmin ? 'Stark Admin' : 'Verified Scholar'}
                 </span>
               </div>
               <p style={{ margin: 0, color: '#8994ad', fontSize: '0.85rem' }}>
-                {user?.email || (isGuest ? 'Local browser session (Zero database usage)' : 'Synchronized Cloud Profile')}
+                {user?.email || 'Synchronized Cloud Profile'}
               </p>
             </div>
           </div>

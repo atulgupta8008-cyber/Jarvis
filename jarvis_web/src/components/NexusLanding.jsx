@@ -156,13 +156,13 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
           >
             <div style={{
               width: '18px', height: '18px', borderRadius: '50%',
-              background: isAdmin ? 'linear-gradient(135deg, #f59e0b, #ef4444)' : 'linear-gradient(135deg, var(--cyan, #6ef6f7), var(--violet, #a996ff))',
+              background: isAdmin ? 'linear-gradient(135deg, #f59e0b, #ef4444)' : (user ? 'linear-gradient(135deg, var(--cyan, #6ef6f7), var(--violet, #a996ff))' : 'rgba(255,255,255,0.1)'),
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', fontWeight: 'bold', color: '#030508'
+              fontSize: '10px', fontWeight: 'bold', color: user ? '#030508' : '#f4f7ff'
             }}>
-              {isAdmin ? '★' : ((profile?.display_name || user?.email || 'G')[0].toUpperCase())}
+              {isAdmin ? '★' : (user ? ((profile?.display_name || user?.email || 'U')[0].toUpperCase()) : '→')}
             </div>
-            <span>{isAdmin ? 'Admin' : (profile?.display_name || (user ? 'Profile' : 'Sign In'))}</span>
+            <span>{isAdmin ? 'Admin' : (user ? (profile?.display_name || 'Profile') : 'Sign In')}</span>
           </button>
           <button className="btn-launch" onClick={() => go('professor')}>Open Jarvis <ArrowRight size={14} /></button>
           <button className="mobile-menu-toggle" onClick={() => setMobileMenu(true)} aria-label="Menu"><Menu size={22} /></button>
