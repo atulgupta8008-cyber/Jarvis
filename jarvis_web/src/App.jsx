@@ -153,6 +153,11 @@ function AppContent() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  const userRef = useRef(user);
+  userRef.current = user;
+  const isAdminRef = useRef(isAdmin);
+  isAdminRef.current = isAdmin;
+
   // Account switch / logout: reset conversation display to isolate accounts
   useEffect(() => {
     setChatHistory([]);
@@ -171,12 +176,14 @@ function AppContent() {
 
         socket.onopen = () => {
           if (!isSubscribed) return;
+          const currentId = userRef.current?.id;
+          const currentAdmin = isAdminRef.current;
           socket.send(JSON.stringify({ 
             type: 'curiosity_feed_request',
             interested_subjects: profile?.interested_subjects,
             language: profile?.language,
-            user_id: user?.id,
-            role: isAdmin ? 'admin' : 'user',
+            user_id: currentId,
+            role: currentAdmin ? 'admin' : 'user',
             user_profile: profile
           }));
           socket.send(JSON.stringify({ type: 'system_command', action: 'resume_voice_agent' }));
@@ -191,8 +198,15 @@ function AppContent() {
             } else if (data.type === 'state') {
               setState({ status: data.state, mainText: data.main_text, subText: data.sub_text });
             } else if (data.type === 'chat') {
-              const myUserKey = user?.id || (isAdmin ? 'admin_master' : 'guest_local');
-              if (data.user_id && data.user_id !== myUserKey) return;
+              const currentId = userRef.current?.id;
+              const currentAdmin = isAdminRef.current;
+              const myUserKey = currentId || (currentAdmin ? 'admin_master' : 'guest_local');
+              
+              // Only filter out if explicitly destined for another specific account
+              if (data.user_id && data.user_id !== myUserKey && !(myUserKey === 'guest_local' && data.user_id?.startsWith('guest_'))) {
+                return;
+              }
+              
               setChatHistory(prev => {
                 if ((data.role === 'You' || data.role === 'user') && prev.length > 0) {
                   const lastMsg = prev[prev.length - 1];
@@ -299,12 +313,14 @@ function AppContent() {
     const cleanText = text.trim();
     setChatHistory(prev => [...prev, { role: 'user', message: cleanText }]);
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      const currentId = userRef.current?.id;
+      const currentAdmin = isAdminRef.current;
       ws.current.send(JSON.stringify({ 
         type: 'text_command', 
         text: cleanText,
         user_profile: profile,
-        role: isAdmin ? 'admin' : 'user',
-        user_id: user?.id
+        role: currentAdmin ? 'admin' : 'user',
+        user_id: currentId
       }));
     }
     setCommandText('');

@@ -65,41 +65,115 @@ export function AuthProvider({ children }) {
 
   // Load profile from Supabase table or local isolated storage
   const fetchSupabaseProfile = async (userId, userEmail) => {
-    if (!userId) return;
-    const storageKey = getProfileStorageKey(userId);
+    if (!userId && !userEmail) return;
+    const cleanEmail = userEmail ? userEmail.trim().toLowerCase() : null;
+    const storageKeyById = userId ? getProfileStorageKey(userId) : null;
+    const storageKeyByEmail = cleanEmail ? getProfileStorageKey(cleanEmail) : null;
+
+    // Helper: read any existing profile previously saved for this user
+    const getCachedProfile = () => {
+      if (storageKeyById) {
+        const c1 = localStorage.getItem(storageKeyById);
+        if (c1) try { return JSON.parse(c1); } catch {}
+      }
+      if (storageKeyByEmail) {
+        const c2 = localStorage.getItem(storageKeyByEmail);
+        if (c2) try { return JSON.parse(c2); } catch {}
+      }
+      try {
+        const vault = JSON.parse(localStorage.getItem('jarvis_account_profiles') || '{}');
+        if (cleanEmail && vault[cleanEmail]) return vault[cleanEmail];
+      } catch {}
+      return null;
+    };
+
+    const cachedProfile = getCachedProfile();
 
     if (!supabase || !isSupabaseConfigured) {
-      const cached = localStorage.getItem(storageKey);
-      if (cached) {
-        setProfile(JSON.parse(cached));
+      if (cachedProfile) {
+        const merged = { ...DEFAULT_PROFILE, ...cachedProfile };
+        setProfile(merged);
+        setIsAdmin(merged.role === 'admin');
+        if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(merged));
+        if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(merged));
+      } else {
+        const initial = {
+          ...DEFAULT_PROFILE,
+          display_name: cleanEmail ? cleanEmail.split('@')[0] : 'Scholar',
+          email: cleanEmail
+        };
+        setProfile(initial);
+        if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(initial));
+        if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(initial));
       }
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      let supaProfile = null;
 
-      if (data && !error) {
+      // 1. Try querying Supabase by id
+      if (userId) {
+        const { data: byId } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        if (byId) supaProfile = byId;
+      }
+
+      // 2. Try querying Supabase by email if id didn't return a profile
+      if (!supaProfile && cleanEmail) {
+        const { data: byEmail } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+        if (byEmail) supaProfile = byEmail;
+      }
+
+      if (supaProfile) {
         const freshUserProf = {
           ...DEFAULT_PROFILE,
-          ...data,
-          interested_subjects: Array.isArray(data.interested_subjects) 
-            ? data.interested_subjects 
-            : DEFAULT_PROFILE.interested_subjects
+          ...cachedProfile, // Any locally saved updates take precedence if fresher
+          ...supaProfile,
+          interested_subjects: Array.isArray(supaProfile.interested_subjects) && supaProfile.interested_subjects.length > 0
+            ? supaProfile.interested_subjects 
+            : (cachedProfile?.interested_subjects || DEFAULT_PROFILE.interested_subjects)
         };
         setProfile(freshUserProf);
         setIsAdmin(freshUserProf.role === 'admin');
-        localStorage.setItem(storageKey, JSON.stringify(freshUserProf));
+        if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(freshUserProf));
+        if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(freshUserProf));
+        if (cleanEmail) {
+          try {
+            const vault = JSON.parse(localStorage.getItem('jarvis_account_profiles') || '{}');
+            vault[cleanEmail] = freshUserProf;
+            localStorage.setItem('jarvis_account_profiles', JSON.stringify(vault));
+          } catch {}
+        }
+      } else if (cachedProfile) {
+        // Restore from preserved local profile
+        const merged = { ...DEFAULT_PROFILE, ...cachedProfile };
+        setProfile(merged);
+        setIsAdmin(merged.role === 'admin');
+        if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(merged));
+        if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(merged));
+        // Sync to Supabase table
+        try {
+          await supabase.from('user_profiles').upsert({
+            id: userId,
+            email: cleanEmail,
+            ...merged,
+            updated_at: new Date().toISOString()
+          });
+        } catch {}
       } else {
-        // Create clean initial profile for this new user (NEVER spreading old in-memory profile)
+        // Genuinely brand new user: create initial profile
         const initialProfile = {
           id: userId,
-          email: userEmail,
-          display_name: userEmail ? userEmail.split('@')[0] : 'Scholar',
+          email: cleanEmail,
+          display_name: cleanEmail ? cleanEmail.split('@')[0] : 'Scholar',
           language: 'English',
           interested_subjects: DEFAULT_PROFILE.interested_subjects,
           education_level: 'Undergraduate',
@@ -112,10 +186,15 @@ export function AuthProvider({ children }) {
           console.warn('[AuthContext] Profile upsert notice:', e);
         }
         setProfile(initialProfile);
-        localStorage.setItem(storageKey, JSON.stringify(initialProfile));
+        if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(initialProfile));
+        if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(initialProfile));
       }
     } catch (err) {
       console.warn('[AuthContext] Profile fetch notice:', err);
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+        setIsAdmin(cachedProfile.role === 'admin');
+      }
     }
   };
 
@@ -128,7 +207,8 @@ export function AuthProvider({ children }) {
         setUser(adminUser);
         setIsAdmin(true);
         setIsGuest(false);
-        const adminProf = {
+        const cachedAdmin = localStorage.getItem(getProfileStorageKey('admin_master'));
+        const adminProf = cachedAdmin ? JSON.parse(cachedAdmin) : {
           display_name: 'Atul (Stark Admin)',
           role: 'admin',
           language: 'English',
@@ -346,7 +426,8 @@ export function AuthProvider({ children }) {
       localStorage.setItem(LOCAL_STORAGE_ADMIN_KEY, 'active');
       localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(adminUser));
       
-      const adminProf = {
+      const cachedAdmin = localStorage.getItem(getProfileStorageKey('admin_master'));
+      const adminProf = cachedAdmin ? JSON.parse(cachedAdmin) : {
         display_name: 'Atul (Stark Admin)',
         role: 'admin',
         language: 'English',
@@ -472,10 +553,23 @@ export function AuthProvider({ children }) {
     const updated = { ...profile, ...updatedFields };
     setProfile(updated);
     
+    // 1. Save by user.id
     if (user?.id) {
       localStorage.setItem(getProfileStorageKey(user.id), JSON.stringify(updated));
     }
 
+    // 2. Save by user.email
+    if (user?.email) {
+      const cleanEmail = user.email.trim().toLowerCase();
+      localStorage.setItem(getProfileStorageKey(cleanEmail), JSON.stringify(updated));
+      try {
+        const vault = JSON.parse(localStorage.getItem('jarvis_account_profiles') || '{}');
+        vault[cleanEmail] = updated;
+        localStorage.setItem('jarvis_account_profiles', JSON.stringify(vault));
+      } catch {}
+    }
+
+    // 3. Save to Supabase DB
     if (user && !isGuest && isSupabaseConfigured && supabase) {
       try {
         await supabase.from('user_profiles').upsert({

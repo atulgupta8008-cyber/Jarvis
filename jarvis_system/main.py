@@ -23,9 +23,6 @@ from core.brain import JarvisBrain
 
 # Import All Skill Modules
 import skills.web_ops as web_ops
-import skills.doc_ops as doc_ops
-import skills.vision as vision
-import skills.system_ops as system_ops
 import skills.productivity as productivity
 import skills.interpreter as interpreter
 import skills.macro_ops as macro_ops
@@ -210,15 +207,18 @@ async def jarvis_processing_loop():
             parent_id = command.get("parent_id", "")
             node_id = command.get("node_id", "")
             
-            res = await professor_ops.handle_fractal_expand(context, target_var)
-            await manager.broadcast({
-                "type": "fractal_expanded",
-                "parent_id": parent_id,
-                "node_id": node_id,
-                "target_variable": target_var,
-                "equation": res["equation"],
-                "explanation": res["explanation"]
-            })
+            try:
+                res = await professor_ops.handle_fractal_expand(context, target_var)
+                await manager.broadcast({
+                    "type": "fractal_expanded",
+                    "parent_id": parent_id,
+                    "node_id": node_id,
+                    "target_variable": target_var,
+                    "equation": res["equation"],
+                    "explanation": res["explanation"]
+                })
+            except Exception as e:
+                print(f"Error expanding fractal: {e}")
             continue
 
         if input_type == "professor_load_history":
@@ -436,208 +436,180 @@ async def jarvis_processing_loop():
         if not user_text:
             continue
             
+        user_profile = command.get("user_profile")
+        user_role = command.get("role", "user")
+        user_id = command.get("user_id")
+        user_key = user_id or ("admin_master" if user_role == "admin" else "guest_local")
+
         await manager.broadcast({"type": "chat", "role": "You", "message": user_text, "user_id": user_key})
         
         # 3. CORE PROCESSING (Standard)
         await manager.broadcast({"type": "state", "state": "thinking", "main_text": "Processing", "sub_text": "Accessing Neural Network"})
         
         # 3. THINKING
-        user_profile = command.get("user_profile")
-        user_role = command.get("role", "user")
-        user_id = command.get("user_id")
-        user_key = user_id or ("admin_master" if user_role == "admin" else "guest_local")
         if user_key not in user_conversation_histories:
             user_conversation_histories[user_key] = []
         user_history = user_conversation_histories[user_key]
 
-        response_text, tool_calls = await brain.think(user_text, user_history, input_type=input_type, user_profile=user_profile, role=user_role, user_id=user_id)
-        
-        # 4. EXECUTING
-        if tool_calls:
-            await manager.broadcast({"type": "state", "state": "executing", "main_text": "Executing Action...", "sub_text": "Running system tools"})
+        try:
+            response_text, tool_calls = await brain.think(user_text, user_history, input_type=input_type, user_profile=user_profile, role=user_role, user_id=user_id)
             
-            for tool in tool_calls:
-                name = tool.function.name
-                try:
-                    args = json.loads(tool.function.arguments)
-                except json.JSONDecodeError:
-                    args = {}
-                    
-                needs_summary = False
-                context_data = ""
+            # 4. EXECUTING
+            if tool_calls:
+                await manager.broadcast({"type": "state", "state": "executing", "main_text": "Executing Action...", "sub_text": "Running system tools"})
                 
-                # --- MACRO ROUTINES ---
-                if name == "learn_routine":
-                    response_text = macro_ops.learn_routine(args.get("trigger_phrase", ""), args.get("actions_description", ""))
-                elif name == "delete_routine":
-                    response_text = macro_ops.delete_routine(args.get("trigger_phrase", ""))
-            
-                # --- INFORMATION GATHERING TOOLS ---
-                elif name == "live_web_search":
-                    context_data = web_ops.live_web_search(args.get("query", ""))
-                    needs_summary = True
-                elif name == "retrieve_knowledge":
-                    context_data = doc_ops.search_knowledge_base(args.get("query", ""))
-                    needs_summary = True
-                elif name == "analyze_screen":
-                    context_data = vision.analyze_screen()
-                    needs_summary = True
-                elif name == "read_clipboard":
-                    context_data = productivity.read_clipboard()
-                    needs_summary = True
-                elif name == "extract_active_window_text":
-                    context_data = productivity.extract_active_window_text()
-                    needs_summary = True
-                elif name == "execute_python_code": 
-                    context_data = interpreter.execute_python_code(args.get("code", ""))
-                    needs_summary = True
-                elif name == "get_weather":
-                    context_data = productivity.get_weather(args.get("city", ""))
-                    needs_summary = True
-                elif name == "get_system_time_date":
-                    context_data = system_ops.get_system_time_date()
-                    needs_summary = True
-                elif name == "get_system_status":
-                    context_data = system_ops.get_system_status()
-                    needs_summary = True
-
-                # --- ADVANCED SPACE & ASTROPHYSICS ---
-                elif name == "run_3d_iss_simulation":
-                    context_data = space_ops.run_3d_iss_simulation()
-                    needs_summary = True
-                elif name == "nasa_asteroid_radar":
-                    context_data = space_ops.nasa_asteroid_radar()
-                    needs_summary = True
-                elif name == "solar_system_telemetry":
-                    context_data = space_ops.solar_system_telemetry(args.get("planet_name", ""))
-                    needs_summary = True
-                elif name == "deep_space_research":
-                    context_data = space_ops.deep_space_research(args.get("topic", ""))
-                    needs_summary = True
-
-                # --- ACTION TOOLS ---
-                elif name == "scroll":
-                    response_text = system_ops.scroll(args.get("direction", ""))
-                elif name == "click_on_screen":
-                    response_text = system_ops.click_on_screen(args.get("x_percent", 50), args.get("y_percent", 50))
-                elif name == "open_website":
-                    web_ops.open_website(args.get("url", ""))
-                    response_text = f"I have opened the website for you, sir."
-                elif name == "search_google":
-                    web_ops.search_google(args.get("query", ""))
-                    response_text = f"I have searched Google for {args.get('query', '')}."
-                elif name == "open_local_app":
-                    response_text = system_ops.open_local_app(args.get("app_name", ""))
-                elif name == "change_volume":
-                    response_text = system_ops.change_volume(args.get("level", 50))
-                elif name == "take_note":
-                    response_text = productivity.take_note(args.get("note_content", ""))
-                elif name == "media_control":
-                    response_text = system_ops.media_control(args.get("action", "play"))
-                elif name == "system_command":
-                    response_text = system_ops.system_command(args.get("command", "lock"))
-                elif name == "ghost_type":
-                    response_text = system_ops.ghost_type(args.get("text", ""))
-                
-                # --- STARK HUD TOOL ---
-                elif name == "toggle_stark_hud":
-                    state = args.get("state", "on")
-                    productivity.toggle_stark_hud(state)
-                    response_text = f"Stark HUD resource overlay has been turned {state}."
-
-                # --- MEMORY TOOL ---
-                elif name == "store_new_memory":
-                    fact = args.get("fact", "")
-                    if fact:
-                        if brain.memory_manager.add_fact(fact):
-                            response_text = f"I have permanently committed that to my core memory files, sir: '{fact}'."
-                        else:
-                            response_text = f"I already have that recorded in my memory banks, sir."
-
-                # --- DATA VISUALIZATION ---
-                elif name == "create_interactive_dashboard":
-                    await manager.broadcast({
-                        "type": "dashboard",
-                        "title": args.get("title", "Data Dashboard"),
-                        "chart_type": args.get("chart_type", "bar"),
-                        "x_data": args.get("x_data", []),
-                        "y_data": args.get("y_data", []),
-                        "x_label": args.get("x_label", "X"),
-                        "y_label": args.get("y_label", "Y")
-                    })
-                    response_text = "I have rendered the dashboard for you, sir."
-                    needs_summary = False
-                    
-                # --- PHYSICS ENGINE (THE SWARM) ---
-                elif name == "simulate_physics":
-                    await manager.broadcast({"type": "state", "state": "executing", "main_text": "Physics Engine Online", "sub_text": "Calculating topological matrices..."})
-                    result_url = await physics_ops.simulate_physics(args.get("prompt", ""))
-                    if result_url.startswith("http"):
-                        await manager.broadcast({
-                            "type": "html_view",
-                            "html_url": result_url
-                        })
-                        response_text = "I have generated the interactive physics simulation for you. Rendering in the Data Panel now."
-                    else:
-                        response_text = f"Simulation encountered an error: {result_url}"
-                    needs_summary = False
-                    
-                # --- DUAL-CORE HANDOFF ---
-                elif name == "delegate_to_deep_think_core":
-                    await manager.broadcast({"type": "state", "state": "executing", "main_text": "Deep Think Engaged", "sub_text": "Routing to Gemini Core..."})
-                    
-                    # Temporarily force Gemini for this prompt
-                    from openai import AsyncOpenAI
-                    import config
-                    gemini_client = AsyncOpenAI(api_key=config.GEMINI_API_KEY, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
-                    
-                    messages = [{"role": "system", "content": "You are J.A.R.V.I.S Deep Think Core (Gemini). Solve this complex problem brilliantly."}]
-                    messages.extend(user_history)
-                    messages.append({"role": "user", "content": args.get("task_description", "")})
-                    
+                for tool in tool_calls:
+                    name = tool.function.name
                     try:
-                        resp = await gemini_client.chat.completions.create(model="gemini-1.5-pro", messages=messages, temperature=0.5)
-                        context_data = resp.choices[0].message.content
-                    except Exception as e:
-                        context_data = f"Gemini Core failed: {e}"
+                        args = json.loads(tool.function.arguments)
+                    except json.JSONDecodeError:
+                        args = {}
                         
-                    needs_summary = True
+                    needs_summary = False
+                    context_data = ""
                     
-                # --- RE-EVALUATION ---
-                if needs_summary:
-                    await manager.broadcast({"type": "state", "state": "thinking", "main_text": "Analyzing Data...", "sub_text": "Synthesizing results"})
-                    follow_up_prompt = (
-                        f"Regarding my command: '{user_text}', you gathered this tool data: {context_data}\n\n"
-                        f"Please respond directly to my command using this data. If the data is empty or irrelevant, use your own knowledge and personal memory to answer."
-                    )
-                    response_text, _ = await brain.think(
-                        follow_up_prompt, 
-                        user_history, 
-                        use_tools=False,
-                        input_type=input_type,
-                        user_profile=user_profile,
-                        role=user_role,
-                        user_id=user_id
-                    )
-        
-        if not response_text:
-            response_text = "Task executed successfully, sir."
-        
-        user_history.append({"role": "user", "content": user_text})
-        user_history.append({"role": "assistant", "content": response_text})
-        
-        if len(user_history) > MAX_CHAT_HISTORY:
-            user_conversation_histories[user_key] = user_history[-MAX_CHAT_HISTORY:]
-        
-        await manager.broadcast({"type": "chat", "role": "Jarvis", "message": response_text, "user_id": user_key})
-        
-        # 5. SPEAKING (Only if input was Voice)
-        if input_type == "voice":
-            await manager.broadcast({"type": "state", "state": "speaking", "main_text": "Speaking...", "sub_text": "Audio output active"})
-            await speak_text(response_text)
-        
-        # Reset State
-        await manager.broadcast({"type": "state", "state": "sleeping", "main_text": "System Standby", "sub_text": "Say 'Jarvis' or type a command"})
+                    # --- MACRO ROUTINES ---
+                    if name == "learn_routine":
+                        response_text = macro_ops.learn_routine(args.get("trigger_phrase", ""), args.get("actions_description", ""))
+                    elif name == "delete_routine":
+                        response_text = macro_ops.delete_routine(args.get("trigger_phrase", ""))
+                
+                    # --- INFORMATION GATHERING TOOLS ---
+                    elif name == "live_web_search":
+                        context_data = web_ops.live_web_search(args.get("query", ""))
+                        needs_summary = True
+                    elif name == "extract_active_window_text":
+                        context_data = productivity.extract_active_window_text()
+                        needs_summary = True
+                    elif name == "execute_python_code": 
+                        context_data = interpreter.execute_python_code(args.get("code", ""))
+                        needs_summary = True
+                    elif name == "get_weather":
+                        context_data = productivity.get_weather(args.get("city", ""))
+                        needs_summary = True
+
+                    # --- ADVANCED SPACE & ASTROPHYSICS ---
+                    elif name == "run_3d_iss_simulation":
+                        context_data = space_ops.run_3d_iss_simulation()
+                        needs_summary = True
+                    elif name == "nasa_asteroid_radar":
+                        context_data = space_ops.nasa_asteroid_radar()
+                        needs_summary = True
+                    elif name == "solar_system_telemetry":
+                        context_data = space_ops.solar_system_telemetry(args.get("planet_name", ""))
+                        needs_summary = True
+                    elif name == "deep_space_research":
+                        context_data = space_ops.deep_space_research(args.get("topic", ""))
+                        needs_summary = True
+
+                    # --- ACTION TOOLS ---
+                    elif name == "search_google":
+                        web_ops.search_google(args.get("query", ""))
+                        response_text = f"I have searched Google for {args.get('query', '')}."
+                    
+                    # --- STARK HUD TOOL ---
+                    elif name == "toggle_stark_hud":
+                        state = args.get("state", "on")
+                        productivity.toggle_stark_hud(state)
+                        response_text = f"Stark HUD resource overlay has been turned {state}."
+
+                    # --- MEMORY TOOL ---
+                    elif name == "store_new_memory":
+                        fact = args.get("fact", "")
+                        if fact:
+                            if brain.memory_manager.add_fact(fact):
+                                response_text = f"I have permanently committed that to my core memory files, sir: '{fact}'."
+                            else:
+                                response_text = f"I already have that recorded in my memory banks, sir."
+
+                    # --- DATA VISUALIZATION ---
+                    elif name == "create_interactive_dashboard":
+                        await manager.broadcast({
+                            "type": "dashboard",
+                            "title": args.get("title", "Data Dashboard"),
+                            "chart_type": args.get("chart_type", "bar"),
+                            "x_data": args.get("x_data", []),
+                            "y_data": args.get("y_data", []),
+                            "x_label": args.get("x_label", "X"),
+                            "y_label": args.get("y_label", "Y")
+                        })
+                        response_text = "I have rendered the dashboard for you, sir."
+                        needs_summary = False
+                        
+                    # --- PHYSICS ENGINE (THE SWARM) ---
+                    elif name == "simulate_physics":
+                        await manager.broadcast({"type": "state", "state": "executing", "main_text": "Physics Engine Online", "sub_text": "Calculating topological matrices..."})
+                        result_url = await physics_ops.simulate_physics(args.get("prompt", ""))
+                        if result_url.startswith("http"):
+                            await manager.broadcast({
+                                "type": "html_view",
+                                "html_url": result_url
+                            })
+                            response_text = "I have generated the interactive physics simulation for you. Rendering in the Data Panel now."
+                        else:
+                            response_text = f"Simulation encountered an error: {result_url}"
+                        needs_summary = False
+                        
+                    # --- DUAL-CORE HANDOFF ---
+                    elif name == "delegate_to_deep_think_core":
+                        await manager.broadcast({"type": "state", "state": "executing", "main_text": "Deep Think Engaged", "sub_text": "Routing to Gemini Core..."})
+                        
+                        # Temporarily force Gemini for this prompt
+                        from openai import AsyncOpenAI
+                        import config
+                        gemini_client = AsyncOpenAI(api_key=config.GEMINI_API_KEY, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+                        
+                        messages = [{"role": "system", "content": "You are J.A.R.V.I.S Deep Think Core (Gemini). Solve this complex problem brilliantly."}]
+                        messages.extend(user_history)
+                        messages.append({"role": "user", "content": args.get("task_description", "")})
+                        
+                        try:
+                            resp = await gemini_client.chat.completions.create(model="gemini-1.5-pro", messages=messages, temperature=0.5)
+                            context_data = resp.choices[0].message.content
+                        except Exception as e:
+                            context_data = f"Gemini Core failed: {e}"
+                            
+                        needs_summary = True
+                        
+                    # --- RE-EVALUATION ---
+                    if needs_summary:
+                        await manager.broadcast({"type": "state", "state": "thinking", "main_text": "Analyzing Data...", "sub_text": "Synthesizing results"})
+                        follow_up_prompt = (
+                            f"Regarding my command: '{user_text}', you gathered this tool data: {context_data}\n\n"
+                            f"Please respond directly to my command using this data. If the data is empty or irrelevant, use your own knowledge and personal memory to answer."
+                        )
+                        response_text, _ = await brain.think(
+                            follow_up_prompt, 
+                            user_history, 
+                            use_tools=False,
+                            input_type=input_type,
+                            user_profile=user_profile,
+                            role=user_role,
+                            user_id=user_id
+                        )
+            
+            if not response_text:
+                response_text = "Task executed successfully, sir."
+            
+            user_history.append({"role": "user", "content": user_text})
+            user_history.append({"role": "assistant", "content": response_text})
+            
+            if len(user_history) > MAX_CHAT_HISTORY:
+                user_conversation_histories[user_key] = user_history[-MAX_CHAT_HISTORY:]
+            
+            await manager.broadcast({"type": "chat", "role": "Jarvis", "message": response_text, "user_id": user_key})
+            
+            # 5. SPEAKING (Only if input was Voice)
+            if input_type == "voice":
+                await manager.broadcast({"type": "state", "state": "speaking", "main_text": "Speaking...", "sub_text": "Audio output active"})
+                await speak_text(response_text)
+            
+            # Reset State
+            await manager.broadcast({"type": "state", "state": "sleeping", "main_text": "System Standby", "sub_text": "Say 'Jarvis' or type a command"})
+        except Exception as e:
+            print(f"[Jarvis Flow Error]: {e}")
+            await manager.broadcast({"type": "chat", "role": "Jarvis", "message": f"[System Error]: {e}", "user_id": user_key})
+            await manager.broadcast({"type": "state", "state": "sleeping", "main_text": "System Standby", "sub_text": "Awaiting directive..."})
 
 
 @asynccontextmanager

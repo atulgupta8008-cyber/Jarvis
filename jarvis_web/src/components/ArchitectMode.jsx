@@ -135,7 +135,9 @@ export default function ArchitectMode({ onExit }) {
   }, [myUserId]);
 
   const handleSendMessage = (payload) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN && activeSessionId) {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      const currentSession = activeSessionId || `session_${Date.now()}`;
+      if (!activeSessionId) setActiveSessionId(currentSession);
       setResearchStatus('');
       ws.current.send(JSON.stringify({ 
         type: 'professor_query', 
@@ -143,7 +145,7 @@ export default function ArchitectMode({ onExit }) {
         files: payload.files,
         deep_research: false,
         is_architect_mode: true,
-        session_id: activeSessionId,
+        session_id: currentSession,
         user_profile: profile,
         role: isAdmin ? 'admin' : 'user',
         user_id: myUserId

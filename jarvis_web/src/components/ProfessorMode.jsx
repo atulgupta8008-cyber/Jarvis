@@ -153,11 +153,13 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
   }, [myUserId]);
 
   const send = (payload) => {
-    if (ws.current?.readyState !== WebSocket.OPEN || !activeSessionId) return;
+    if (ws.current?.readyState !== WebSocket.OPEN) return;
+    const currentSession = activeSessionId || `session_${Date.now()}`;
+    if (!activeSessionId) setActiveSessionId(currentSession);
     setResearchStatus('');
     ws.current.send(JSON.stringify({ 
       type: 'professor_query', 
-      session_id: activeSessionId, 
+      session_id: currentSession, 
       user_profile: profile,
       role: isAdmin ? 'admin' : 'user',
       user_id: myUserId,

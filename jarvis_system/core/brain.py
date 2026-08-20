@@ -54,10 +54,6 @@ class JarvisBrain:
         
         # Tools schema compatible with both Groq and Gemini (via OpenAI endpoint)
         self.tools = [
-            {"type": "function", "function": {"name": "open_website", "description": "Opens a physical website URL directly in the user's web browser window. Use ONLY if they say 'open' a site.", "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
-            {"type": "function", "function": {"name": "search_google", "description": "Opens a physical Google search page. ONLY use this if explicitly told to 'open a browser' or 'look up on google'.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
-            {"type": "function", "function": {"name": "open_local_app", "description": "Opens a local Windows application window.", "parameters": {"type": "object", "properties": {"app_name": {"type": "string"}}, "required": ["app_name"]}}},
-            
             # --- CUSTOM ROUTINES (MACROS) ---
             {"type": "function", "function": {"name": "learn_routine", "description": "Saves a new custom routine or macro. Use this when the user asks you to remember a sequence of actions.", "parameters": {"type": "object", "properties": {"trigger_phrase": {"type": "string", "description": "The exact phrase that triggers the routine (e.g., 'Work Mode')."}, "actions_description": {"type": "string", "description": "Detailed description of the tools and actions to execute."}}, "required": ["trigger_phrase", "actions_description"]}}},
             {"type": "function", "function": {"name": "delete_routine", "description": "Deletes a previously saved routine.", "parameters": {"type": "object", "properties": {"trigger_phrase": {"type": "string"}}, "required": ["trigger_phrase"]}}},
@@ -65,16 +61,8 @@ class JarvisBrain:
             # Core System Skills
             {"type": "function", "function": {"name": "live_web_search", "description": "Searches the live internet. DO NOT use this for simple math (like 2+2) or basic knowledge. ONLY use for current events, news, or real-time data.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
             {"type": "function", "function": {"name": "get_system_time_date", "description": "Retrieves current local time.", "parameters": {"type": "object", "properties": {}}}},
-            {"type": "function", "function": {"name": "get_system_status", "description": "Hardware stats.", "parameters": {"type": "object", "properties": {}}}},
-            {"type": "function", "function": {"name": "change_volume", "description": "Sets master volume.", "parameters": {"type": "object", "properties": {"level": {"type": "integer"}}, "required": ["level"]}}},
-            
-            # PC Automation Skills
-            {"type": "function", "function": {"name": "media_control", "description": "Controls system media playback (play, pause, next track, previous track).", "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["playpause", "next", "previous"]}}, "required": ["action"]}}},
-            {"type": "function", "function": {"name": "system_command", "description": "Executes Windows system commands: 'lock' (locks PC), 'minimize' (minimizes all windows), or 'screenshot' (takes a screenshot to desktop).", "parameters": {"type": "object", "properties": {"command": {"type": "string", "enum": ["lock", "minimize", "screenshot"]}}, "required": ["command"]}}},
-            {"type": "function", "function": {"name": "ghost_type", "description": "Physically types out text onto the user's screen into whatever text box is currently focused. Use for dictation or typing out replies.", "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
-            
+                    
             # Productivity Skills
-            {"type": "function", "function": {"name": "read_clipboard", "description": "Reads clipboard text.", "parameters": {"type": "object", "properties": {}}}},
             {"type": "function", "function": {"name": "take_note", "description": "Saves a note text.", "parameters": {"type": "object", "properties": {"note_content": {"type": "string"}}, "required": ["note_content"]}}},
             {"type": "function", "function": {"name": "get_weather", "description": "Gets local weather.", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}},
             
@@ -84,31 +72,6 @@ class JarvisBrain:
                     "name": "extract_active_window_text",
                     "description": "Simulates Ctrl+A and Ctrl+C to instantly extract and read all text from the user's currently open application, webpage, or document.",
                     "parameters": {"type": "object", "properties": {}}
-                }
-            },
-
-            # Mouse Skills
-            {
-                "type": "function",
-                "function": {
-                    "name": "scroll",
-                    "description": "Scrolls the user's screen up or down.",
-                    "parameters": {"type": "object", "properties": {"direction": {"type": "string", "enum": ["up", "down"]}}, "required": ["direction"]}
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "click_on_screen",
-                    "description": "Moves the mouse and clicks on the screen using X and Y percentages (0-100). If you don't know the coordinates, use analyze_screen FIRST to estimate them.",
-                    "parameters": {
-                        "type": "object", 
-                        "properties": {
-                            "x_percent": {"type": "integer", "description": "X coordinate percentage from left (0) to right (100). 50 is center."},
-                            "y_percent": {"type": "integer", "description": "Y coordinate percentage from top (0) to bottom (100). 50 is center."}
-                        }, 
-                        "required": ["x_percent", "y_percent"]
-                    }
                 }
             },
             
@@ -213,11 +176,6 @@ class JarvisBrain:
                 }
             },
 
-            # File and Vision Skills
-            {"type": "function", "function": {"name": "retrieve_knowledge", "description": "Scans offline local knowledge_base folder files. Use this FIRST whenever the user asks about project deadlines, local documents, or files.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
-            {"type": "function", "function": {"name": "analyze_screen", "description": "Takes a screenshot and analyzes what is currently on the user's monitor.", "parameters": {"type": "object", "properties": {}}}},
-            {"type": "function", "function": {"name": "store_new_memory", "description": "CRITICAL: ONLY use this if the user EXPLICITLY says 'remember that' or 'save this fact'.", "parameters": {"type": "object", "properties": {"fact": {"type": "string"}}, "required": ["fact"]}}},
-            
             # --- DUAL-CORE HANDOFF TOOL ---
             {
                 "type": "function",

@@ -134,8 +134,10 @@ export default function StudyGroupMode({ onExit }) {
   }, [myUserId]);
 
   const handleSendMessage = () => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN && activeSessionId) {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       if (!inputText.trim() && attachedFiles.length === 0) return;
+      const currentSession = activeSessionId || `session_${Date.now()}`;
+      if (!activeSessionId) setActiveSessionId(currentSession);
       setResearchStatus('');
 
       ws.current.send(JSON.stringify({ 
@@ -145,7 +147,7 @@ export default function StudyGroupMode({ onExit }) {
         deep_research: false,
         is_study_group: true,
         target_agent: targetAgent,
-        session_id: activeSessionId,
+        session_id: currentSession,
         user_id: myUserId,
         role: isAdmin ? 'admin' : 'user',
         user_profile: profile
