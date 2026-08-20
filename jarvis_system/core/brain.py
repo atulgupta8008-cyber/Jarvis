@@ -228,7 +228,15 @@ class JarvisBrain:
         if not is_admin_user and user_profile:
             name = user_profile.get("display_name", "Scholar")
             subs = ", ".join(user_profile.get("interested_subjects", ["Physics", "Mathematics"])) if isinstance(user_profile.get("interested_subjects"), list) else str(user_profile.get("interested_subjects", ""))
-            context_profile += f"\n\n[ACTIVE LEARNER: Name: {name} | Language: {user_lang} | Subject Interests: {subs}]"
+            learning_style = user_profile.get("learning_style", "Socratic")
+            
+            style_directives = {
+                "Socratic": "PEDAGOGY (Socratic Mode): Deliver a direct, intuitive first-principles answer with vivid thought experiments and analogies, then conclude with ONE sharp catalyst question to spark deeper curiosity.",
+                "Deep Derivations": "PEDAGOGY (Deep Derivations Mode): Deliver an exhaustive, step-by-step mathematical proof from foundational conservation laws/axioms using LaTeX <math_board>, explaining the physical meaning of every variable.",
+                "Simulation-First": "PEDAGOGY (Simulation-First Mode): Anchor the explanation in visual dynamics and physical geometry, using <simulation_board type=\"plotly\"> for interactive 2D/3D simulations and <diagram_board> for system flowcharts."
+            }
+            chosen_directive = style_directives.get(learning_style, style_directives["Socratic"])
+            context_profile += f"\n\n[ACTIVE LEARNER: Name: {name} | Language: {user_lang} | Teaching Style: {learning_style} | Subject Interests: {subs}]\n[{chosen_directive}]"
 
         facts = self.memory_manager.memory["facts"][-20:]
         facts_str = "; ".join(facts) if facts else "None"
