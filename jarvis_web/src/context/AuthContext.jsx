@@ -139,39 +139,17 @@ export function AuthProvider({ children }) {
             localStorage.setItem('jarvis_account_profiles', JSON.stringify(vault));
           } catch {}
         }
-      } else if (cachedProfile) {
-        const merged = { ...DEFAULT_PROFILE, ...cachedProfile };
-        setProfile(merged);
-        setIsAdmin(merged.role === 'admin');
-        if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(merged));
-        if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(merged));
-        try {
-          await supabase.from('user_profiles').upsert({
-            id: userId,
-            email: cleanEmail,
-            ...merged,
-            updated_at: new Date().toISOString()
-          });
-        } catch {}
       } else {
-        const initialProfile = {
-          id: userId,
-          email: cleanEmail,
-          display_name: cleanEmail ? cleanEmail.split('@')[0] : 'Scholar',
-          language: 'English',
-          interested_subjects: DEFAULT_PROFILE.interested_subjects,
-          education_level: 'Undergraduate',
-          learning_style: 'Socratic',
-          role: 'user'
-        };
-        try {
-          await supabase.from('user_profiles').upsert(initialProfile);
-        } catch (e) {
-          console.warn('[AuthContext] Profile upsert notice:', e);
+        // Account does not exist in Supabase database (e.g. was deleted)
+        // Never resurrect deleted users into the database!
+        if (cachedProfile && !isSupabaseConfigured) {
+          setProfile(cachedProfile);
+          setIsAdmin(cachedProfile.role === 'admin');
+        } else {
+          // If in cloud mode and user was deleted from DB, reset to default state
+          setProfile({ ...DEFAULT_PROFILE });
+          setIsAdmin(false);
         }
-        setProfile(initialProfile);
-        if (storageKeyById) localStorage.setItem(storageKeyById, JSON.stringify(initialProfile));
-        if (storageKeyByEmail) localStorage.setItem(storageKeyByEmail, JSON.stringify(initialProfile));
       }
     } catch (err) {
       console.warn('[AuthContext] Profile fetch notice:', err);
@@ -458,7 +436,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      // 1. Strict Database Verification: Check if account exists in Supabase DB first
+      // 1. Strict Database Verification: Check if account exists in Supabase DB
       let dbUserRow = null;
       try {
         const { data: profiles } = await supabase
@@ -474,11 +452,16 @@ export function AuthProvider({ children }) {
         console.warn('[AuthContext] Database presence check notice:', dbCheckErr);
       }
 
-      const vault = JSON.parse(localStorage.getItem('jarvis_account_vault') || '{}');
-      const hasLocalVaultAccount = Boolean(vault[cleanEmail]);
-
-      // If user is neither in database nor in verified local vault, REJECT immediately!
-      if (!dbUserRow && !hasLocalVaultAccount) {
+      // If user does not exist in Supabase database, strictly REJECT!
+      if (!dbUserRow) {
+        // Also remove any stale local vault entry if present
+        try {
+          const vault = JSON.parse(localStorage.getItem('jarvis_account_vault') || '{}');
+          if (vault[cleanEmail]) {
+            delete vault[cleanEmail];
+            localStorage.setItem('jarvis_account_vault', JSON.stringify(vault));
+          }
+        } catch {}
         return { 
           data: null, 
           error: { message: 'No account found with this email. Please switch to the Sign Up tab to register.' } 
@@ -500,36 +483,10 @@ export function AuthProvider({ children }) {
         return { data, error: null };
       }
 
-      // 3. Fallback for accounts created with pending confirmation
-      if (hasLocalVaultAccount) {
-        if (vault[cleanEmail] === cleanPass) {
-          const deterministicId = dbUserRow?.id || `usr_${btoa(cleanEmail).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
-          const verifiedUser = { id: deterministicId, email: cleanEmail };
-          setUser(verifiedUser);
-          setIsAdmin(false);
-          localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_KEY, JSON.stringify(verifiedUser));
-          await fetchSupabaseProfile(deterministicId, cleanEmail);
-          setShowAuthModal(false);
-          return { data: { user: verifiedUser }, error: null };
-        } else {
-          return { 
-            data: null, 
-            error: { message: 'Invalid password. Please check your credentials and try again.' } 
-          };
-        }
-      }
-
-      // 4. If account exists in database but password didn't match
-      if (dbUserRow) {
-        return { 
-          data: null, 
-          error: { message: 'Invalid password. Please check your credentials and try again.' } 
-        };
-      }
-
+      // 3. If password did not match or auth failed
       return { 
         data: null, 
-        error: { message: 'No account found with this email. Please switch to the Sign Up tab to register.' } 
+        error: { message: 'Invalid password. Please check your credentials and try again.' } 
       };
     } catch (error) {
       return { data: null, error: { message: error.message || 'Authentication error.' } };

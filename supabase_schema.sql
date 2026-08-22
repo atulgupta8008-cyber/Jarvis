@@ -1,7 +1,7 @@
 -- =========================================================================
--- NOVANETS / JARVIS AI — CLEAN UNIFIED DATABASE SCHEMA
+-- NOVANETS / JARVIS AI — CLEAN UNIFIED DATABASE SCHEMA WITH CASCADE DELETES
 -- =========================================================================
--- Paste and run this script in your Supabase SQL Editor (Dashboard -> SQL Editor)
+-- Paste and run this entire script in your Supabase SQL Editor (Dashboard -> SQL Editor)
 
 -- 1. Enable UUID Extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -60,13 +60,47 @@ CREATE TABLE IF NOT EXISTS public.session_media (
 
 CREATE INDEX IF NOT EXISTS idx_session_media_session ON public.session_media(session_id);
 
--- 6. ENABLE ROW LEVEL SECURITY AND PERMISSIVE POLICIES
+-- 6. CASCADE CLEANUP TRIGGER ON USER DELETION
+-- When a user is deleted from public.user_profiles, automatically wipe all their sessions & data!
+CREATE OR REPLACE FUNCTION public.handle_user_profile_deletion()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Delete all chat sessions belonging to this user (which cascades to messages & media)
+  DELETE FROM public.chat_sessions WHERE user_id = OLD.id OR user_id = OLD.email;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_user_profile_deleted ON public.user_profiles;
+CREATE TRIGGER on_user_profile_deleted
+BEFORE DELETE ON public.user_profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_user_profile_deletion();
+
+-- 7. CASCADE CLEANUP TRIGGER ON SUPABASE AUTH DELETION
+-- When a user is deleted from auth.users (Supabase Dashboard -> Authentication -> Users),
+-- automatically delete their user_profiles row (which triggers session cleanup)!
+CREATE OR REPLACE FUNCTION public.handle_auth_user_deletion()
+RETURNS TRIGGER AS $$
+BEGIN
+  DELETE FROM public.user_profiles WHERE id = OLD.id::text OR email = OLD.email;
+  DELETE FROM public.chat_sessions WHERE user_id = OLD.id::text OR user_id = OLD.email;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_deleted ON auth.users;
+CREATE TRIGGER on_auth_user_deleted
+BEFORE DELETE ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_auth_user_deletion();
+
+-- 8. ENABLE ROW LEVEL SECURITY AND PERMISSIVE POLICIES
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.session_media ENABLE ROW LEVEL SECURITY;
 
--- Allow public read/write access so both authenticated and guest workflows operate seamlessly
 DROP POLICY IF EXISTS "Public access user_profiles" ON public.user_profiles;
 CREATE POLICY "Public access user_profiles" ON public.user_profiles FOR ALL USING (true) WITH CHECK (true);
 
