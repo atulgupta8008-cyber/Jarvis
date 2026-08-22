@@ -166,11 +166,12 @@ const WidgetCard = ({ widget, onMinimize, onRemove, onFractalExpand }) => {
         <div 
           style={{ 
             flex: 1, 
-            padding: '20px', 
-            overflow: 'auto',
+            padding: '14px 12px', 
+            overflowY: 'auto',
+            overflowX: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
+            alignItems: 'stretch',
             minHeight: 0,
             color: '#fff'
           }}
@@ -183,7 +184,7 @@ const WidgetCard = ({ widget, onMinimize, onRemove, onFractalExpand }) => {
               allowFullScreen
             />
           ) : widget.type === 'math' ? (
-            <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '100%', maxWidth: '100%' }}>
               <FractalEquation 
                 node={initialTree}
                 context={widget.content}
@@ -266,7 +267,7 @@ const WidgetCard = ({ widget, onMinimize, onRemove, onFractalExpand }) => {
             </button>
           </div>
 
-          <div style={{ flex: 1, width: '100%', height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, width: '100%', height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {widget.type === 'simulation' ? (
               <iframe 
                 src={resolveSimulationUrl(widget.content)} 
@@ -275,7 +276,7 @@ const WidgetCard = ({ widget, onMinimize, onRemove, onFractalExpand }) => {
                 allowFullScreen
               />
             ) : widget.type === 'math' ? (
-              <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{ width: '100%', maxWidth: '960px', margin: '0 auto', padding: '16px 8px' }}>
                 <FractalEquation 
                   node={initialTree}
                   context={widget.content}
