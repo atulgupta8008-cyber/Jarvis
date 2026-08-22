@@ -14,8 +14,8 @@ jobs:
         run: |
           BACKEND_URL="${{ secrets.RENDER_BACKEND_URL }}"
           if [ -z "$BACKEND_URL" ]; then
-            # Fallback if secret is not yet set
-            BACKEND_URL="https://jarvis-backend.onrender.com"
+            # Fallback to your live Render backend
+            BACKEND_URL="https://jarvis-x6kv.onrender.com"
           fi
           echo "Pinging: ${BACKEND_URL}/health"
           curl -s -m 30 "${BACKEND_URL}/health" || true
