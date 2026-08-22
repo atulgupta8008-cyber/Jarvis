@@ -206,6 +206,20 @@ function AppContent() {
     }
   }, [user?.id, isAdmin]);
 
+  // Client-Side Immediate Warmup Probe & Periodic Keep-Alive Heartbeat
+  useEffect(() => {
+    const warmUpBackend = async () => {
+      try {
+        await fetch(`${API_URL}/health`, { mode: 'no-cors' });
+      } catch {}
+    };
+    // Immediate ping upon page load
+    warmUpBackend();
+    // Maintain keepalive every 4 minutes while browser tab is open
+    const interval = setInterval(warmUpBackend, 4 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Keep Main WebSocket connection alive
   useEffect(() => {
     let isSubscribed = true;

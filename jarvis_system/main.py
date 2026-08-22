@@ -127,6 +127,54 @@ async def audio_listener_loop():
     while True:
         await asyncio.sleep(3600)
 
+SERVER_START_TIME = time.time()
+
+async def render_keepalive_loop():
+    """
+    Prevents Render Free Tier from spinning down after 15 minutes of inactivity.
+    Periodically sends an HTTP GET request to its own external URL every 10 minutes (600s).
+    """
+    # Wait 30 seconds after server boot before starting keep-alive requests
+    await asyncio.sleep(30)
+    
+    external_url = (
+        os.getenv("RENDER_EXTERNAL_URL") 
+        or os.getenv("BACKEND_URL") 
+        or os.getenv("RENDER_URL")
+    )
+    
+    if external_url:
+        clean_ext = external_url.rstrip("/")
+        print(f"[KeepAlive] Render auto-pinger active for target: {clean_ext}/health")
+    else:
+        print("[KeepAlive] Auto-pinger standing by (RENDER_EXTERNAL_URL will activate on Render deployment).")
+
+    while True:
+        try:
+            target_url = (
+                os.getenv("RENDER_EXTERNAL_URL") 
+                or os.getenv("BACKEND_URL") 
+                or os.getenv("RENDER_URL")
+            )
+            if target_url:
+                clean_url = f"{target_url.rstrip('/')}/health"
+                def _ping():
+                    import urllib.request
+                    req = urllib.request.Request(
+                        clean_url, 
+                        headers={"User-Agent": "Jarvis-Render-KeepAlive/2.0"}
+                    )
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        return resp.status
+                
+                status = await asyncio.to_thread(_ping)
+                print(f"[KeepAlive] Successfully pinged {clean_url} (HTTP {status}) at {time.strftime('%X')}")
+        except Exception as e:
+            print(f"[KeepAlive Notice]: {e}")
+            
+        # Ping every 10 minutes (600 seconds) — safely before Render's 15-minute idle limit (900 seconds)
+        await asyncio.sleep(600)
+
 async def cleanup_loop():
     """Periodically cleans up old simulation files to prevent disk space exhaustion."""
     static_dir = os.path.join(os.path.dirname(__file__), "static", "simulations")
@@ -619,12 +667,14 @@ async def lifespan(app: FastAPI):
     task2 = asyncio.create_task(audio_listener_loop())
     task3 = asyncio.create_task(telemetry_loop())
     task4 = asyncio.create_task(cleanup_loop())
+    task5 = asyncio.create_task(render_keepalive_loop())
     yield
     # Shutdown: Cancel tasks
     task1.cancel()
     task2.cancel()
     task3.cancel()
     task4.cancel()
+    task5.cancel()
 
 app = FastAPI(title="Jarvis Quantum API", lifespan=lifespan)
 
@@ -635,6 +685,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+@app.get("/health")
+@app.get("/api/health")
+async def health_check():
+    uptime_seconds = int(time.time() - SERVER_START_TIME)
+    return {
+        "status": "online",
+        "service": "Jarvis Quantum AI Engine",
+        "uptime_seconds": uptime_seconds,
+        "active_websockets": len(manager.active_connections),
+        "timestamp": time.time()
+    }
 
 # Mount static directory for Physics Engine output
 static_dir = os.path.join(os.path.dirname(__file__), "static")

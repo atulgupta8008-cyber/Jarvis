@@ -1,0 +1,21 @@
+name: Render Backend 24/7 Keep-Alive
+
+on:
+  schedule:
+    # Runs every 10 minutes (Render spins down after 15 minutes of inactivity)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend Health Endpoint
+        run: |
+          BACKEND_URL="${{ secrets.RENDER_BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ]; then
+            # Fallback if secret is not yet set
+            BACKEND_URL="https://jarvis-backend.onrender.com"
+          fi
+          echo "Pinging: ${BACKEND_URL}/health"
+          curl -s -m 30 "${BACKEND_URL}/health" || true
