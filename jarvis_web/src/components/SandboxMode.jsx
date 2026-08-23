@@ -11,7 +11,12 @@ export default function SandboxMode({ onExit }) {
   const [widgets, setWidgets] = useState([]);
   const [isThinking, setIsThinking] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [mobileActivePane, setMobileActivePane] = useState('chat');
+  const [mobileActivePane, setMobileActivePane] = useState('chat'); // 'chat' | 'board'
+  const [hasUnseenBoard, setHasUnseenBoard] = useState(false);
+  const mobileActivePaneRef = useRef(mobileActivePane);
+  useEffect(() => {
+    mobileActivePaneRef.current = mobileActivePane;
+  }, [mobileActivePane]);
   const ws = useRef(null);
 
   useEffect(() => {
@@ -52,6 +57,9 @@ export default function SandboxMode({ onExit }) {
             content: data.content,
             minimized: false
           }]);
+          if (mobileActivePaneRef.current === 'chat') {
+            setHasUnseenBoard(true);
+          }
         } else if (data.type === 'deep_research_status') {
           setIsThinking(true);
         }
@@ -108,10 +116,19 @@ export default function SandboxMode({ onExit }) {
           <MessageSquare size={16} /> Chat
         </button>
         <button 
-          className={mobileActivePane === 'board' ? 'is-selected' : ''} 
-          onClick={() => setMobileActivePane('board')}
+          className={`${mobileActivePane === 'board' ? 'is-selected' : ''} ${hasUnseenBoard && mobileActivePane === 'chat' ? 'has-unseen' : ''}`} 
+          onClick={() => {
+            setMobileActivePane('board');
+            setHasUnseenBoard(false);
+          }}
         >
           <LayoutDashboard size={16} /> Canvas
+          {widgets.length > 0 && (
+            <span className="board-count-pill">{widgets.length}</span>
+          )}
+          {hasUnseenBoard && mobileActivePane === 'chat' && (
+            <span className="board-beacon-dot" title="New content on canvas" />
+          )}
         </button>
       </div>
 

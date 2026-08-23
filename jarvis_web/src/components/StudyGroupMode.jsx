@@ -33,6 +33,11 @@ export default function StudyGroupMode({ onExit }) {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [targetAgent, setTargetAgent] = useState('all');
   const [mobileTab, setMobileTab] = useState('chat');
+  const [hasUnseenBoard, setHasUnseenBoard] = useState(false);
+  const mobileTabRef = useRef(mobileTab);
+  useEffect(() => {
+    mobileTabRef.current = mobileTab;
+  }, [mobileTab]);
   const ws = useRef(null);
 
   const myUserId = user?.id || (isAdmin ? 'admin_master' : null);
@@ -99,12 +104,18 @@ export default function StudyGroupMode({ onExit }) {
             author: data.author,
             minimized: false
           }]);
+          if (mobileTabRef.current === 'chat') {
+            setHasUnseenBoard(true);
+          }
         } else if (data.type === 'fractal_expanded') {
           setBlackboardWidgets((widgets) => widgets.map((widget) => {
             if (widget.id !== data.parent_id) return widget;
             const tree = widget.tree || { id: widget.id, equation: widget.content, children: [] };
             return { ...widget, tree: addChildToNode(tree, data.node_id, { id: `${data.node_id}_${Date.now()}`, equation: data.equation, explanation: data.explanation, children: [] }) };
           }));
+          if (mobileTabRef.current === 'chat') {
+            setHasUnseenBoard(true);
+          }
         } else if (data.type === 'research_status') {
           setResearchStatus(data.status);
           if (data.status && (
@@ -319,10 +330,16 @@ export default function StudyGroupMode({ onExit }) {
           </button>
           <button 
             type="button"
-            className={mobileTab === 'board' ? 'active' : ''} 
-            onClick={() => setMobileTab('board')}
+            className={`${mobileTab === 'board' ? 'active' : ''} ${hasUnseenBoard && mobileTab === 'chat' ? 'has-unseen' : ''}`} 
+            onClick={() => {
+              setMobileTab('board');
+              setHasUnseenBoard(false);
+            }}
           >
             <Layout size={13} /> Blackboard {blackboardWidgets.length > 0 && `(${blackboardWidgets.length})`}
+            {hasUnseenBoard && mobileTab === 'chat' && (
+              <span className="board-beacon-dot" title="New content on blackboard" />
+            )}
           </button>
         </div>
         <div className="study-group-header-actions">

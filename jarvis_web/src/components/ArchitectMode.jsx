@@ -32,6 +32,11 @@ export default function ArchitectMode({ onExit }) {
   
   // Forge design system state
   const [mobilePane, setMobilePane] = useState('chat');
+  const [hasUnseenBoard, setHasUnseenBoard] = useState(false);
+  const mobilePaneRef = useRef(mobilePane);
+  useEffect(() => {
+    mobilePaneRef.current = mobilePane;
+  }, [mobilePane]);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
 
   const [researchStatus, setResearchStatus] = useState('');
@@ -99,12 +104,18 @@ export default function ArchitectMode({ onExit }) {
             content: data.content,
             minimized: false
           }]);
+          if (mobilePaneRef.current === 'chat') {
+            setHasUnseenBoard(true);
+          }
         } else if (data.type === 'fractal_expanded') {
           setBlackboardWidgets((widgets) => widgets.map((widget) => {
             if (widget.id !== data.parent_id) return widget;
             const tree = widget.tree || { id: widget.id, equation: widget.content, children: [] };
             return { ...widget, tree: addChildToNode(tree, data.node_id, { id: `${data.node_id}_${Date.now()}`, equation: data.equation, explanation: data.explanation, children: [] }) };
           }));
+          if (mobilePaneRef.current === 'chat') {
+            setHasUnseenBoard(true);
+          }
         } else if (data.type === 'research_status') {
           setResearchStatus(data.status);
           if (data.status && (
@@ -292,10 +303,19 @@ export default function ArchitectMode({ onExit }) {
         </button>
         <button 
           type="button"
-          className={mobilePane === 'board' ? 'is-selected' : ''} 
-          onClick={() => setMobilePane('board')}
+          className={`${mobilePane === 'board' ? 'is-selected' : ''} ${hasUnseenBoard && mobilePane === 'chat' ? 'has-unseen' : ''}`} 
+          onClick={() => {
+            setMobilePane('board');
+            setHasUnseenBoard(false);
+          }}
         >
           <Layout size={15} /> Board
+          {blackboardWidgets.length > 0 && (
+            <span className="board-count-pill">{blackboardWidgets.length}</span>
+          )}
+          {hasUnseenBoard && mobilePane === 'chat' && (
+            <span className="board-beacon-dot" title="New content on board" />
+          )}
         </button>
       </div>
 

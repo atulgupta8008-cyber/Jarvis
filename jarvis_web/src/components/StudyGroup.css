@@ -423,6 +423,13 @@
     display: flex;
   }
 
+  .study-group-mobile-tabs button.has-unseen {
+    border-color: rgba(110, 246, 247, 0.75) !important;
+    background: rgba(110, 246, 247, 0.09) !important;
+    color: #6ef6f7 !important;
+    animation: boardBtnBorderGlow 1.6s ease-in-out infinite alternate !important;
+  }
+
   .study-group-stage-grid {
     display: flex;
     flex-direction: column;
