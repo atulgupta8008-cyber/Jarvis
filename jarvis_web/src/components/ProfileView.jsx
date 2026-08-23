@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Shield, Globe, BookOpen, GraduationCap, Cpu, 
-  ArrowLeft, Check, LogOut, Sparkles, KeyRound, Compass, Save, AlertTriangle, X
+  ArrowLeft, Check, LogOut, Sparkles, KeyRound, Compass, Save, AlertTriangle, X, Trash2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './ProfileView.css';
@@ -34,7 +34,7 @@ const LEARNING_STYLES = [
 ];
 
 export default function ProfileView({ onExit, onClose }) {
-  const { user, profile, isAdmin, updateProfile, signOut } = useAuth();
+  const { user, profile, isAdmin, updateProfile, signOut, deleteAccount } = useAuth();
   const handleBack = onExit || onClose;
 
   const [displayName, setDisplayName] = useState(profile.display_name || 'Scholar');
@@ -44,6 +44,8 @@ export default function ProfileView({ onExit, onClose }) {
   const [learningStyle, setLearningStyle] = useState(profile.learning_style || 'Socratic');
   const [savedToast, setSavedToast] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Sync inputs whenever active profile changes
   useEffect(() => {
@@ -82,6 +84,17 @@ export default function ProfileView({ onExit, onClose }) {
     handleBack?.();
   };
 
+  const handleConfirmDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteAccount();
+      setShowDeleteConfirm(false);
+      handleBack?.();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="profile-page-container">
       <div className="profile-bg-glow" />
@@ -93,6 +106,30 @@ export default function ProfileView({ onExit, onClose }) {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {!isAdmin && (
+            <button 
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#f87171',
+                padding: '8px 14px',
+                borderRadius: 8,
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.18)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+            >
+              <Trash2 size={13} /> Delete Account
+            </button>
+          )}
+
           <button 
             onClick={() => setShowLogoutConfirm(true)}
             style={{
@@ -106,7 +143,8 @@ export default function ProfileView({ onExit, onClose }) {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 6
+              gap: 6,
+              transition: 'all 0.2s'
             }}
           >
             <LogOut size={13} /> Sign Out
@@ -435,6 +473,87 @@ export default function ProfileView({ onExit, onClose }) {
                   }}
                 >
                   Yes, Sign Out
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showDeleteConfirm && (
+          <div className="modal-overlay" style={{ zIndex: 100000 }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 10 }}
+              style={{
+                width: '100%',
+                maxWidth: '420px',
+                background: 'rgba(12, 6, 12, 0.98)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: '16px',
+                padding: '28px',
+                color: '#fff',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 35px rgba(239, 68, 68, 0.25)',
+                backdropFilter: 'blur(20px)',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                display: 'grid',
+                placeItems: 'center',
+                margin: '0 auto 16px',
+                color: '#f87171'
+              }}>
+                <AlertTriangle size={24} />
+              </div>
+
+              <h3 style={{ margin: '0 0 8px', fontSize: '1.25rem', fontFamily: 'Syne, sans-serif', color: '#fca5a5' }}>
+                Permanently Delete Account?
+              </h3>
+              <p style={{ margin: '0 0 24px', color: '#94a3b8', fontSize: '0.84rem', lineHeight: 1.5 }}>
+                This will permanently delete your account, learning preferences, and <strong>all chat sessions and media across all modes</strong> from the database. This action is irreversible.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 8,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#c8d0e0',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: isDeleting ? 'wait' : 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteAccount}
+                  disabled={isDeleting}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 8,
+                    background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+                    border: 'none',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: isDeleting ? 'wait' : 'pointer',
+                    boxShadow: '0 0 15px rgba(239, 68, 68, 0.4)'
+                  }}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Everything'}
                 </button>
               </div>
             </motion.div>

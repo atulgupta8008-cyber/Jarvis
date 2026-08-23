@@ -541,6 +541,69 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Delete Account: completely purges the user profile, all chat sessions, messages, and local data
+  const deleteAccount = async () => {
+    if (!user) return { success: false, error: 'No active user' };
+
+    const currentUserId = user.id;
+    const currentUserEmail = user.email ? user.email.trim().toLowerCase() : null;
+
+    try {
+      if (supabase && isSupabaseConfigured) {
+        // 1. Delete all chat sessions belonging to this user (which cascades to chat_messages and session_media)
+        try {
+          await supabase
+            .from('chat_sessions')
+            .delete()
+            .or(`user_id.eq.${currentUserId},user_id.eq.${currentUserEmail}`);
+        } catch (sessErr) {
+          console.warn('[AuthContext] Session delete notice:', sessErr);
+        }
+
+        // 2. Delete user profile row
+        try {
+          await supabase
+            .from('user_profiles')
+            .delete()
+            .or(`id.eq.${currentUserId},email.eq.${currentUserEmail}`);
+        } catch (profErr) {
+          console.warn('[AuthContext] Profile delete notice:', profErr);
+        }
+      }
+
+      // 3. Purge all local storage for this user
+      localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_KEY);
+      localStorage.removeItem(getProfileStorageKey(currentUserId));
+      if (currentUserEmail) {
+        localStorage.removeItem(getProfileStorageKey(currentUserEmail));
+        try {
+          const vault = JSON.parse(localStorage.getItem('jarvis_account_vault') || '{}');
+          delete vault[currentUserEmail];
+          localStorage.setItem('jarvis_account_vault', JSON.stringify(vault));
+
+          const profilesVault = JSON.parse(localStorage.getItem('jarvis_account_profiles') || '{}');
+          delete profilesVault[currentUserEmail];
+          localStorage.setItem('jarvis_account_profiles', JSON.stringify(profilesVault));
+        } catch {}
+      }
+
+      // 4. Sign out from Supabase Auth
+      try {
+        if (supabase && isSupabaseConfigured) {
+          await supabase.auth.signOut();
+        }
+      } catch {}
+
+      setUser(null);
+      setIsAdmin(false);
+      setProfile({ ...DEFAULT_PROFILE });
+      return { success: true };
+    } catch (err) {
+      console.error('[AuthContext] Error deleting account:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -556,6 +619,7 @@ export function AuthProvider({ children }) {
       signUp,
       signInAdmin,
       signOut,
+      deleteAccount,
       updateProfile,
       fetchSupabaseProfile
     }}>
