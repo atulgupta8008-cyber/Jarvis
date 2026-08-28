@@ -230,7 +230,7 @@ async def handle_professor_query(
         if user_lang == "Hinglish":
             lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in natural, conversational Hinglish (Hindi written in Roman/English alphabet blended with technical English words, e.g. 'Dekho, first principles se samjhte hain...')."
         else:
-            lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in crisp, articulate academic English."
+            lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in simple English."
         system_guardrails += f"\n\n[{lang_directive}]"
 
         if user_profile:

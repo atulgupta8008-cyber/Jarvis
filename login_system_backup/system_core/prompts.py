@@ -155,7 +155,7 @@ def format_student_context(user_profile: Optional[dict] = None, role: str = "use
             "Keep all formulas and scientific terms in standard English and LaTeX ($...$)."
         )
     else:
-        lang_note = "Language Mode: International Standard Academic English."
+        lang_note = "Language Mode: Standard Simple English."
 
     return (
         f"[STUDENT PROFILE: Name: {name} | {lang_note} | Academic Level: {level} | "

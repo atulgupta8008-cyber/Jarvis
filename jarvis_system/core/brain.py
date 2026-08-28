@@ -222,7 +222,7 @@ class JarvisBrain:
         if user_lang == "Hinglish":
             lang_directive = "LANGUAGE DIRECTIVE: You MUST respond in natural, conversational Hinglish (Hindi written in Roman/English alphabet blended seamlessly with precise English technical terms, e.g. 'Haan, first principles se breakdown karte hain...')."
         else:
-            lang_directive = "LANGUAGE DIRECTIVE: You MUST respond in crisp, articulate English."
+            lang_directive = "LANGUAGE DIRECTIVE: You MUST respond in simple English."
 
         # Adapt student context for normal users
         if not is_admin_user and user_profile:
