@@ -84,18 +84,31 @@ class SocraticCloudEngine:
             return "admin_master"
         return str(user_id).strip()
 
+    def _clean_session_id(self, session_id: str) -> str:
+        """Ensures session_id is always a valid UUID string compatible with Postgres UUID columns."""
+        if not session_id or str(session_id).strip() in ["", "null", "undefined", "default_academic_session"]:
+            return str(uuid.uuid4())
+        raw = str(session_id).strip()
+        try:
+            val = uuid.UUID(raw)
+            return str(val)
+        except (ValueError, AttributeError):
+            # Deterministically transform non-UUID string into a valid UUID
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, raw))
+
     async def save_professor_message(self, session_id: str, role: str, content: str, user_id: str = None, teaching_score: dict = None):
         """Saves a single turn of conversation to Supabase or local cache."""
         effective_user = self._clean_user_id(user_id)
+        clean_sid = self._clean_session_id(session_id)
 
         # 1. Always save to local fallback cache
         local_data = self._read_local_db()
         local_messages = local_data.get("messages", {})
-        if session_id not in local_messages:
-            local_messages[session_id] = []
-        local_messages[session_id].append({
+        if clean_sid not in local_messages:
+            local_messages[clean_sid] = []
+        local_messages[clean_sid].append({
             "id": str(uuid.uuid4()),
-            "session_id": session_id,
+            "session_id": clean_sid,
             "role": role,
             "content": content,
             "user_id": effective_user,
@@ -108,13 +121,13 @@ class SocraticCloudEngine:
         sessions = local_data.get("sessions", [])
         sess_found = False
         for s in sessions:
-            if s.get("id") == session_id:
+            if s.get("id") == clean_sid:
                 s["user_id"] = effective_user
                 sess_found = True
                 break
         if not sess_found:
             sessions.insert(0, {
-                "id": session_id,
+                "id": clean_sid,
                 "session_title": "New Session",
                 "mode": "professor",
                 "user_id": effective_user,
@@ -127,10 +140,23 @@ class SocraticCloudEngine:
         if not self.client: return
         
         def _save():
+            # Ensure the session row exists in chat_sessions so foreign keys don't fail
+            try:
+                chk = self.client.table("chat_sessions").select("id").eq("id", clean_sid).execute()
+                if not chk.data or len(chk.data) == 0:
+                    self.client.table("chat_sessions").insert({
+                        "id": clean_sid,
+                        "session_title": "New Session",
+                        "mode": "professor",
+                        "user_id": effective_user
+                    }).execute()
+            except Exception as e:
+                print(f"[Supabase] Ensure session exists notice: {e}")
+
             # Try chat_messages table
             try:
                 data = {
-                    "session_id": session_id, 
+                    "session_id": clean_sid, 
                     "role": role, 
                     "content": content,
                     "teaching_score": teaching_score
@@ -142,7 +168,7 @@ class SocraticCloudEngine:
 
             # Fallback to legacy professor_chat_history table
             try:
-                data = {"session_id": session_id, "role": role, "content": content}
+                data = {"session_id": clean_sid, "role": role, "content": content}
                 self.client.table("professor_chat_history").insert(data).execute()
             except Exception:
                 pass
@@ -151,11 +177,12 @@ class SocraticCloudEngine:
 
     async def load_professor_session(self, session_id: str, user_id: str = None) -> list:
         """Loads a full session history from Supabase or local cache."""
+        clean_sid = self._clean_session_id(session_id)
         def _load_supabase():
             if not self.client: return None
             # 1. Try chat_messages table
             try:
-                res = self.client.table("chat_messages").select("role, content, teaching_score, created_at").eq("session_id", session_id).order("created_at").execute()
+                res = self.client.table("chat_messages").select("role, content, teaching_score, created_at").eq("session_id", clean_sid).order("created_at").execute()
                 if res.data is not None and len(res.data) > 0:
                     return [{"role": row["role"], "content": row["content"], "teaching_score": row.get("teaching_score")} for row in res.data]
             except Exception:
@@ -163,7 +190,7 @@ class SocraticCloudEngine:
 
             # 2. Try legacy professor_chat_history table
             try:
-                res = self.client.table("professor_chat_history").select("role, content").eq("session_id", session_id).order("timestamp").execute()
+                res = self.client.table("professor_chat_history").select("role, content").eq("session_id", clean_sid).order("timestamp").execute()
                 if res.data is not None and len(res.data) > 0:
                     return [{"role": row["role"], "content": row["content"]} for row in res.data]
             except Exception:
@@ -176,24 +203,32 @@ class SocraticCloudEngine:
 
         # Fallback to local cache
         local_data = self._read_local_db()
-        return local_data.get("messages", {}).get(session_id, [])
+        return local_data.get("messages", {}).get(clean_sid, [])
 
-    async def create_new_session(self, initial_title: str = "New Session", mode: str = "professor", user_id: str = None) -> str:
+    async def create_new_session(self, initial_title: str = "New Session", mode: str = "professor", user_id: str = None, session_id: str = None) -> str:
         """Creates a new session and returns its UUID."""
-        new_id = str(uuid.uuid4())
+        new_id = self._clean_session_id(session_id) if session_id else str(uuid.uuid4())
         created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         effective_user = self._clean_user_id(user_id)
 
         # Save to local cache
         local_data = self._read_local_db()
         sessions = local_data.get("sessions", [])
-        sessions.insert(0, {
-            "id": new_id,
-            "session_title": initial_title,
-            "mode": mode,
-            "user_id": effective_user,
-            "created_at": created_at
-        })
+        # Check if already in local
+        already = False
+        for s in sessions:
+            if s.get("id") == new_id:
+                s["user_id"] = effective_user
+                already = True
+                break
+        if not already:
+            sessions.insert(0, {
+                "id": new_id,
+                "session_title": initial_title,
+                "mode": mode,
+                "user_id": effective_user,
+                "created_at": created_at
+            })
         local_data["sessions"] = sessions
         self._write_local_db(local_data)
 
@@ -202,6 +237,9 @@ class SocraticCloudEngine:
 
         def _create():
             try:
+                chk = self.client.table("chat_sessions").select("id").eq("id", new_id).execute()
+                if chk.data and len(chk.data) > 0:
+                    return new_id
                 payload = {
                     "id": new_id,
                     "session_title": initial_title, 
@@ -218,9 +256,12 @@ class SocraticCloudEngine:
 
         return await asyncio.to_thread(_create)
 
-    async def get_or_create_empty_session(self, initial_title: str = "New Session", mode: str = "professor", user_id: str = None) -> str:
+    async def get_or_create_empty_session(self, initial_title: str = "New Session", mode: str = "professor", user_id: str = None, session_id: str = None) -> str:
         """Reuses the most recent empty session if one exists for this user and mode, otherwise creates a new one."""
         effective_user = self._clean_user_id(user_id)
+
+        if session_id:
+            return await self.create_new_session(initial_title=initial_title, mode=mode, user_id=effective_user, session_id=session_id)
 
         # Check local DB first for an empty session by this user and mode
         local_data = self._read_local_db()
@@ -300,10 +341,11 @@ class SocraticCloudEngine:
 
     async def update_session_title(self, session_id: str, title: str):
         """Updates the title of a specific session."""
+        clean_sid = self._clean_session_id(session_id)
         # Update local
         local_data = self._read_local_db()
         for s in local_data.get("sessions", []):
-            if s["id"] == session_id:
+            if s["id"] == clean_sid:
                 s["session_title"] = title
                 break
         self._write_local_db(local_data)
@@ -311,50 +353,51 @@ class SocraticCloudEngine:
         if not self.client: return
         def _update():
             try:
-                self.client.table("chat_sessions").update({"session_title": title, "updated_at": "now()"}).eq("id", session_id).execute()
+                self.client.table("chat_sessions").update({"session_title": title, "updated_at": "now()"}).eq("id", clean_sid).execute()
                 return
             except Exception:
                 pass
             try:
-                self.client.table("professor_sessions").update({"session_title": title, "updated_at": "now()"}).eq("id", session_id).execute()
+                self.client.table("professor_sessions").update({"session_title": title, "updated_at": "now()"}).eq("id", clean_sid).execute()
             except Exception:
                 pass
         await asyncio.to_thread(_update)
 
     async def delete_session(self, session_id: str):
         """Deletes a session, its chat history, and its uploaded media files."""
+        clean_sid = self._clean_session_id(session_id)
         # Delete local
         local_data = self._read_local_db()
-        local_data["sessions"] = [s for s in local_data.get("sessions", []) if s["id"] != session_id]
-        if session_id in local_data.get("messages", {}):
-            del local_data["messages"][session_id]
+        local_data["sessions"] = [s for s in local_data.get("sessions", []) if s["id"] != clean_sid]
+        if clean_sid in local_data.get("messages", {}):
+            del local_data["messages"][clean_sid]
         self._write_local_db(local_data)
 
         def _delete():
             if self.client:
                 try:
-                    self.client.table("session_media").delete().eq("session_id", session_id).execute()
+                    self.client.table("session_media").delete().eq("session_id", clean_sid).execute()
                 except Exception:
                     pass
                 try:
-                    self.client.table("chat_messages").delete().eq("session_id", session_id).execute()
+                    self.client.table("chat_messages").delete().eq("session_id", clean_sid).execute()
                 except Exception:
                     pass
                 try:
-                    self.client.table("chat_sessions").delete().eq("id", session_id).execute()
+                    self.client.table("chat_sessions").delete().eq("id", clean_sid).execute()
                 except Exception:
                     pass
                 try:
-                    self.client.table("professor_chat_history").delete().eq("session_id", session_id).execute()
+                    self.client.table("professor_chat_history").delete().eq("session_id", clean_sid).execute()
                 except Exception:
                     pass
                 try:
-                    self.client.table("professor_sessions").delete().eq("id", session_id).execute()
+                    self.client.table("professor_sessions").delete().eq("id", clean_sid).execute()
                 except Exception:
                     pass
             
             # Clean local media cache
-            sess_dir = os.path.join(self.media_cache_dir, str(session_id))
+            sess_dir = os.path.join(self.media_cache_dir, str(clean_sid))
             if os.path.exists(sess_dir):
                 import shutil
                 try:
@@ -369,10 +412,11 @@ class SocraticCloudEngine:
     # -------------------------------------------------------------
 
     async def save_session_media(self, session_id: str, name: str, mime: str, size: int, base64_data: str, user_id: str = None, text_content: str = "") -> dict:
+        clean_sid = self._clean_session_id(session_id)
         media_id = str(uuid.uuid4())
         created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        sess_dir = os.path.join(self.media_cache_dir, str(session_id))
+        sess_dir = os.path.join(self.media_cache_dir, str(clean_sid))
         os.makedirs(sess_dir, exist_ok=True)
 
         local_file_path = os.path.join(sess_dir, name)
@@ -390,7 +434,7 @@ class SocraticCloudEngine:
 
         media_item = {
             "id": media_id,
-            "session_id": session_id,
+            "session_id": clean_sid,
             "name": name,
             "mime_type": mime or "application/octet-stream",
             "size": size or 0,
@@ -411,7 +455,7 @@ class SocraticCloudEngine:
             try:
                 data_payload = {
                     "id": media_id,
-                    "session_id": session_id,
+                    "session_id": clean_sid,
                     "file_name": name,
                     "mime_type": mime or "application/octet-stream",
                     "file_size": size or 0,
@@ -427,15 +471,16 @@ class SocraticCloudEngine:
         return media_item
 
     async def fetch_session_media(self, session_id: str, user_id: str = None) -> list:
-        if not session_id: return []
+        clean_sid = self._clean_session_id(session_id)
+        if not clean_sid: return []
 
         def _fetch_from_supabase():
             if not self.client: return None
             try:
-                res = self.client.table("session_media").select("*").eq("session_id", session_id).order("created_at", desc=True).execute()
+                res = self.client.table("session_media").select("*").eq("session_id", clean_sid).order("created_at", desc=True).execute()
                 if res.data is not None and len(res.data) > 0:
                     items = []
-                    sess_dir = os.path.join(self.media_cache_dir, str(session_id))
+                    sess_dir = os.path.join(self.media_cache_dir, str(clean_sid))
                     for row in res.data:
                         items.append({
                             "id": row.get("id"),
@@ -456,42 +501,40 @@ class SocraticCloudEngine:
             return items
 
         # Fallback to local session media cache
-        sess_dir = os.path.join(self.media_cache_dir, str(session_id))
-        if not os.path.exists(sess_dir):
-            return []
-
+        sess_dir = os.path.join(self.media_cache_dir, str(clean_sid))
         local_items = []
-        try:
-            for fname in os.listdir(sess_dir):
-                if fname.startswith("meta_") and fname.endswith(".json"):
-                    with open(os.path.join(sess_dir, fname), "r", encoding="utf-8") as f:
-                        local_items.append(json.load(f))
-        except Exception:
-            pass
-
-        return sorted(local_items, key=lambda x: x.get("created_at", ""), reverse=True)
+        if os.path.exists(sess_dir):
+            for file_name in os.listdir(sess_dir):
+                if file_name.startswith("meta_") and file_name.endswith(".json"):
+                    try:
+                        with open(os.path.join(sess_dir, file_name), "r", encoding="utf-8") as f:
+                            local_items.append(json.load(f))
+                    except Exception:
+                        pass
+        return local_items
 
     async def delete_session_media(self, session_id: str, media_id: str):
+        clean_sid = self._clean_session_id(session_id)
+        sess_dir = os.path.join(self.media_cache_dir, str(clean_sid))
+        meta_path = os.path.join(sess_dir, f"meta_{media_id}.json")
+        
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                real_file = meta.get("local_path")
+                if real_file and os.path.exists(real_file):
+                    os.remove(real_file)
+                os.remove(meta_path)
+            except Exception as e:
+                print(f"[MediaVault] Error deleting local media: {e}")
+
         def _delete():
             if self.client:
                 try:
-                    self.client.table("session_media").delete().eq("id", media_id).eq("session_id", session_id).execute()
+                    self.client.table("session_media").delete().eq("id", media_id).execute()
                 except Exception:
                     pass
-
-            sess_dir = os.path.join(self.media_cache_dir, str(session_id))
-            meta_path = os.path.join(sess_dir, f"meta_{media_id}.json")
-            if os.path.exists(meta_path):
-                try:
-                    with open(meta_path, "r", encoding="utf-8") as f:
-                        meta = json.load(f)
-                    file_path = meta.get("local_path")
-                    if file_path and os.path.exists(file_path):
-                        os.remove(file_path)
-                    os.remove(meta_path)
-                except Exception:
-                    pass
-
         await asyncio.to_thread(_delete)
 
 # Singleton instance

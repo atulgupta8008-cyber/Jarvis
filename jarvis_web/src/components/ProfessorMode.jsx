@@ -24,12 +24,27 @@ function setNodeLoading(node, targetId, variable) {
     : node;
 }
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function ProfessorMode({ onExit, initialQuestion, curiosityQuestion }) {
   const { user, profile, isAdmin } = useAuth();
   const [chatHistory, setChatHistory] = useState([]);
   const [blackboardWidgets, setBlackboardWidgets] = useState([]);
   const [sessions, setSessions] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeSessionId, setActiveSessionId] = useState(() => generateUUID());
+  const activeSessionIdRef = useRef(activeSessionId);
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
   const [sessionMedia, setSessionMedia] = useState([]);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
@@ -62,6 +77,7 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
       ws.current.send(JSON.stringify({ 
         type: 'professor_create_session', 
         mode: 'professor',
+        session_id: activeSessionIdRef.current,
         user_id: myUserId,
         role: isAdmin ? 'admin' : 'user'
       }));
@@ -103,9 +119,15 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
           if (data.mode === 'professor') {
             setActiveSessionId(data.session_id);
             setResearchStatus('');
-            setChatHistory([]);
-            setBlackboardWidgets([]);
-            setSessionMedia([]);
+            // Do NOT wipe chatHistory if the user already started sending messages
+            setChatHistory((prev) => {
+              if (prev.length > 0) {
+                return prev;
+              }
+              setBlackboardWidgets([]);
+              setSessionMedia([]);
+              return [];
+            });
             // Fetch media for this fresh session
             ws.current.send(JSON.stringify({ type: 'professor_fetch_media', session_id: data.session_id, user_id: myUserId }));
             
@@ -165,7 +187,7 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
 
   const send = (payload) => {
     if (ws.current?.readyState !== WebSocket.OPEN) return;
-    const currentSession = activeSessionId || `session_${Date.now()}`;
+    const currentSession = activeSessionIdRef.current || activeSessionId || generateUUID();
     if (!activeSessionId) setActiveSessionId(currentSession);
     setResearchStatus('');
     ws.current.send(JSON.stringify({ 
@@ -181,8 +203,18 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
 
   const createSession = () => {
     setResearchStatus('');
+    setChatHistory([]);
+    setBlackboardWidgets([]);
+    setSessionMedia([]);
+    const freshId = generateUUID();
+    setActiveSessionId(freshId);
     if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'professor', user_id: myUserId }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_create_session', 
+        mode: 'professor', 
+        session_id: freshId,
+        user_id: myUserId 
+      }));
     }
   };
 

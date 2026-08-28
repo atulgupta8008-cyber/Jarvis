@@ -226,8 +226,9 @@ async def jarvis_processing_loop():
         if input_type == "professor_create_session":
             mode = command.get("mode", "professor")
             user_id = command.get("user_id")
+            client_session_id = command.get("session_id")
             try:
-                new_id = await professor_ops.cloud_engine.get_or_create_empty_session(mode=mode, user_id=user_id)
+                new_id = await professor_ops.cloud_engine.get_or_create_empty_session(mode=mode, user_id=user_id, session_id=client_session_id)
                 await manager.broadcast({"type": "professor_session_created", "session_id": new_id, "user_id": user_id, "mode": mode})
                 # Auto-refresh sessions list for this user
                 sessions = await professor_ops.cloud_engine.fetch_all_sessions(mode=mode, user_id=user_id)
@@ -325,7 +326,8 @@ async def jarvis_processing_loop():
             await manager.broadcast({"type": "state", "state": "executing", "main_text": "Professor Mode", "sub_text": "Analyzing document and context..."})
             
             # Extract user_id and session_id at the TOP so all branches use them
-            session_id = command.get("session_id", "default_academic_session")
+            raw_session_id = command.get("session_id", "default_academic_session")
+            session_id = professor_ops.cloud_engine._clean_session_id(raw_session_id)
             user_id = command.get("user_id")
             files_data = command.get("files", [])
             is_deep_research = command.get("deep_research", False)

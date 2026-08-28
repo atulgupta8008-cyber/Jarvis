@@ -22,6 +22,17 @@ function setNodeLoading(node, targetId, variable) {
     : node;
 }
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function StudyGroupMode({ onExit }) {
   const { user, profile, isAdmin } = useAuth();
   const [chatHistory, setChatHistory] = useState([]);
@@ -30,7 +41,11 @@ export default function StudyGroupMode({ onExit }) {
   const [isThinking, setIsThinking] = useState(false);
   const [inputText, setInputText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeSessionId, setActiveSessionId] = useState(() => generateUUID());
+  const activeSessionIdRef = useRef(activeSessionId);
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
   const [targetAgent, setTargetAgent] = useState('all');
   const [mobileTab, setMobileTab] = useState('chat');
   const [hasUnseenBoard, setHasUnseenBoard] = useState(false);
@@ -44,7 +59,7 @@ export default function StudyGroupMode({ onExit }) {
 
   // Clear history on user account switch
   useEffect(() => {
-    setActiveSessionId(null);
+    setActiveSessionId(generateUUID());
     setChatHistory([]);
     setBlackboardWidgets([]);
   }, [myUserId]);
@@ -56,6 +71,7 @@ export default function StudyGroupMode({ onExit }) {
       ws.current.send(JSON.stringify({ 
         type: 'professor_create_session', 
         mode: 'study_group',
+        session_id: activeSessionIdRef.current,
         user_id: myUserId,
         role: isAdmin ? 'admin' : 'user'
       }));
@@ -93,8 +109,13 @@ export default function StudyGroupMode({ onExit }) {
           if (data.mode === 'study_group') {
             setActiveSessionId(data.session_id);
             setResearchStatus('');
-            setChatHistory([]);
-            setBlackboardWidgets([]);
+            setChatHistory(prev => {
+              if (prev.length > 0) {
+                return prev;
+              }
+              setBlackboardWidgets([]);
+              return [];
+            });
           }
         } else if (data.type === 'blackboard_widget') {
           setBlackboardWidgets(prev => [...prev, {
@@ -147,7 +168,7 @@ export default function StudyGroupMode({ onExit }) {
   const handleSendMessage = () => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       if (!inputText.trim() && attachedFiles.length === 0) return;
-      const currentSession = activeSessionId || `session_${Date.now()}`;
+      const currentSession = activeSessionIdRef.current || activeSessionId || generateUUID();
       if (!activeSessionId) setActiveSessionId(currentSession);
       setResearchStatus('');
 

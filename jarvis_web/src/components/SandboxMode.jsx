@@ -5,12 +5,27 @@ import { WS_URL } from '../config';
 import Blackboard from './Blackboard';
 import ChatPanel from './ChatPanel';
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function SandboxMode({ onExit }) {
   const [inputText, setInputText] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [widgets, setWidgets] = useState([]);
   const [isThinking, setIsThinking] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
+  const [sessionId, setSessionId] = useState(() => generateUUID());
+  const sessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
   const [mobileActivePane, setMobileActivePane] = useState('chat'); // 'chat' | 'board'
   const [hasUnseenBoard, setHasUnseenBoard] = useState(false);
   const mobileActivePaneRef = useRef(mobileActivePane);
@@ -23,14 +38,20 @@ export default function SandboxMode({ onExit }) {
     ws.current = new WebSocket(WS_URL);
     ws.current.onopen = () => {
       ws.current.send(JSON.stringify({ type: 'system_command', action: 'pause_voice_agent' }));
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'sandbox' }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_create_session', 
+        mode: 'sandbox',
+        session_id: sessionIdRef.current 
+      }));
     };
 
     ws.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'professor_session_created') {
-          setSessionId(data.session_id);
+          if (data.mode === 'sandbox') {
+            setSessionId(data.session_id);
+          }
         } else if (data.type === 'professor_stream_chunk') {
           setChatMessages(prev => {
             const newHistory = [...prev];

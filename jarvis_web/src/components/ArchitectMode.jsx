@@ -23,12 +23,27 @@ function setNodeLoading(node, targetId, variable) {
     : node;
 }
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function ArchitectMode({ onExit }) {
   const { user, profile, isAdmin } = useAuth();
   const [chatHistory, setChatHistory] = useState([]);
   const [blackboardWidgets, setBlackboardWidgets] = useState([]);
   const [sessions, setSessions] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeSessionId, setActiveSessionId] = useState(() => generateUUID());
+  const activeSessionIdRef = useRef(activeSessionId);
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
   
   // Forge design system state
   const [mobilePane, setMobilePane] = useState('chat');
@@ -63,6 +78,7 @@ export default function ArchitectMode({ onExit }) {
       ws.current.send(JSON.stringify({ 
         type: 'professor_create_session', 
         mode: 'architect',
+        session_id: activeSessionIdRef.current,
         user_id: myUserId,
         role: isAdmin ? 'admin' : 'user'
       }));
@@ -94,8 +110,13 @@ export default function ArchitectMode({ onExit }) {
           if (data.mode === 'architect') {
             setActiveSessionId(data.session_id);
             setResearchStatus('');
-            setChatHistory([]);
-            setBlackboardWidgets([]);
+            setChatHistory((prev) => {
+              if (prev.length > 0) {
+                return prev;
+              }
+              setBlackboardWidgets([]);
+              return [];
+            });
           }
         } else if (data.type === 'blackboard_widget') {
           setBlackboardWidgets(prev => [...prev, {
@@ -147,7 +168,7 @@ export default function ArchitectMode({ onExit }) {
 
   const handleSendMessage = (payload) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      const currentSession = activeSessionId || `session_${Date.now()}`;
+      const currentSession = activeSessionIdRef.current || activeSessionId || generateUUID();
       if (!activeSessionId) setActiveSessionId(currentSession);
       setResearchStatus('');
       ws.current.send(JSON.stringify({ 
@@ -167,8 +188,17 @@ export default function ArchitectMode({ onExit }) {
 
   const handleNewSession = () => {
     setResearchStatus('');
+    setChatHistory([]);
+    setBlackboardWidgets([]);
+    const freshId = generateUUID();
+    setActiveSessionId(freshId);
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'professor_create_session', mode: 'architect', user_id: myUserId }));
+      ws.current.send(JSON.stringify({ 
+        type: 'professor_create_session', 
+        mode: 'architect', 
+        session_id: freshId,
+        user_id: myUserId 
+      }));
     }
   };
 
