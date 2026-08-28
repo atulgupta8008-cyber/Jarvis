@@ -74,17 +74,32 @@ async def simulate_physics(prompt: str) -> str:
     safe_html_path = output_html_path.replace('\\', '\\\\')
 
     system_prompt = f"""
-    You are The Swarm, an elite computational physics engine.
-    Write a complete, zero-error Python script that simulates the user's prompt using numpy and plotly.graph_objects.
-    CRITICAL INSTRUCTIONS:
+    You are The Swarm, an elite computational physics simulation engine.
+    Write a complete, zero-error Python script that creates a BEAUTIFUL, PUBLICATION-QUALITY interactive visualization.
+
+    CRITICAL CODE INSTRUCTIONS:
     1. Use numpy arrays and vectorized mathematics for physical simulations and numerical step integrations (Euler, RK4, or parametric equations).
     2. Do NOT import scipy or any other non-standard packages. Only import numpy, math, and plotly (plotly.graph_objects as go, plotly.express as px).
     3. The script MUST NOT use any GUI popups (do NOT use plt.show() or fig.show()).
-    4. The script MUST generate a highly detailed, interactive 3D visualization.
+    4. NEVER use invalid Plotly properties (e.g. wireframe=True in go.Surface).
     5. The final step MUST save the HTML file to this exact path:
        fig.write_html('{safe_html_path}')
     6. Return ONLY the raw executable python code. Do not include markdown codeblocks (```python) or any other text. Start directly with imports.
-    7. NEVER use invalid Plotly properties (e.g. wireframe=True in go.Surface). If you want a wireframe, use Three.js instead.
+
+    CRITICAL VISUALIZATION QUALITY INSTRUCTIONS:
+    7. The visualization MUST fill the ENTIRE canvas. Use layout settings:
+       - margin=dict(l=20, r=20, t=50, b=20) — minimal margins so the plot fills the space
+       - width=None (omit or don't set) — let it be responsive to container
+       - height=700 minimum for 3D, 500 minimum for 2D
+       - autosize=True
+    8. Use a DARK THEME: paper_bgcolor='#0a0e17', plot_bgcolor='#0a0e17', font_color='#e0e6f0'
+    9. Use VIBRANT, HIGH-CONTRAST colors for traces: electric cyan (#00f7ff), neon violet (#a855f7), bright amber (#ffd166), emerald (#34d399), hot rose (#ff6b9d). Never use dull or muted colors.
+    10. Include CLEAR, DESCRIPTIVE axis titles with units (e.g. 'Displacement x (meters)', 'Time t (seconds)').
+    11. Include a DESCRIPTIVE chart title that explains what the simulation shows.
+    12. For 3D plots: Use camera=dict(eye=dict(x=1.5, y=1.5, z=1.2)) for a good viewing angle. Add colorscale='Viridis' or 'Plasma' for surfaces.
+    13. For line plots: Use line_width=2.5 minimum. Add hover info. Use mode='lines' (not markers) unless scatter is needed.
+    14. Generate ENOUGH data points for smooth, beautiful curves (at least 200-500 for parametric, 50x50 grid for surfaces).
+    15. The simulation must be PHYSICALLY MEANINGFUL — compute real values, use actual physical constants where appropriate, and create visualizations that genuinely illustrate the physics described in the prompt.
     """
     
     try:
@@ -94,7 +109,7 @@ async def simulate_physics(prompt: str) -> str:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2
+            temperature=0.15
         )
         
         raw_code = response.choices[0].message.content.strip()

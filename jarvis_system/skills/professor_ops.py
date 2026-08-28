@@ -238,7 +238,31 @@ async def handle_professor_query(
             subs = ", ".join(user_profile.get("interested_subjects", ["Physics", "Mathematics"])) if isinstance(user_profile.get("interested_subjects"), list) else str(user_profile.get("interested_subjects", ""))
             system_guardrails += f"\n\n[ACTIVE LEARNER: Name: {name} | Preferred Language: {user_lang} | Teaching Style: {learning_style} | Subject Interests: {subs}]"
 
-        system_guardrails += "\n\nSTRICT OUTPUT CONSTRAINT:\n1. Use the <math_board>...</math_board> tag exclusively for pure, valid LaTeX equations and multi-step derivations (use \\begin{aligned} ... \\end{aligned} for multi-line derivations). Wrap any explanatory step titles inside \\text{Step 1: ...}. NEVER write plain unescaped English sentences or numbered lists outside \\text{} inside <math_board>.\n2. Use the <diagram_board>...</diagram_board> tag exclusively for free-body diagrams, system architectures, or flowcharts written in Mermaid.js syntax.\n3. Use the <simulation_board>...</simulation_board> tag exclusively to prompt the physics engine to generate a 3D visualization using Plotly/Three.js.\n\nThink deeply. Provide exhaustive, step-by-step derivations on the blackboard. Use simulations liberally to demonstrate complex systems. Never use these tags for normal conversation."
+        system_guardrails += "\n\nOUTPUT INTELLIGENCE RULES:\n" \
+            "BLACKBOARD USAGE — THINK BEFORE YOU DRAW:\n" \
+            "You have access to 3 powerful blackboard tools. Use them ONLY when they genuinely deepen understanding. Do NOT use them reflexively or on every response.\n\n" \
+            "WHEN TO USE <math_board>:\n" \
+            "- The student explicitly asks for a derivation, proof, or mathematical breakdown\n" \
+            "- The concept fundamentally requires equations to be understood (e.g. Maxwell's equations, Schrödinger equation)\n" \
+            "- You are walking through a multi-step calculation or showing how one equation leads to another\n" \
+            "WHEN NOT TO USE <math_board>: Greetings, conceptual explanations that don't need math, follow-up questions, casual discussion, or when the student is asking a simple factual question\n\n" \
+            "WHEN TO USE <simulation_board>:\n" \
+            "- The concept involves dynamic behavior that is dramatically easier to understand visually (trajectories, wave propagation, field lines, phase transitions, orbital mechanics)\n" \
+            "- The student explicitly asks to 'see', 'visualize', or 'simulate' something\n" \
+            "- A parameter sweep or comparative visualization would reveal non-obvious physics\n" \
+            "WHEN NOT TO USE <simulation_board>: Greetings, simple definitions, conceptual Q&A, derivations that don't benefit from animation, or when a static equation is sufficient\n\n" \
+            "WHEN TO USE <diagram_board>:\n" \
+            "- System architecture, causal chains, free-body diagrams, or process flows that clarify relationships\n" \
+            "WHEN NOT TO USE <diagram_board>: Simple linear explanations, greetings, or when the relationship is obvious from text\n\n" \
+            "CONVERSATIONAL INTELLIGENCE:\n" \
+            "- If the student says hello, greets you, or makes small talk: respond naturally and warmly like a real professor. Do NOT generate any blackboard content.\n" \
+            "- If the student asks a simple factual question (e.g. 'What is entropy?'): give a clear, eloquent explanation. Only add <math_board> if the defining equation is essential.\n" \
+            "- If the student asks a deep conceptual question or requests a derivation: THEN unleash the full blackboard arsenal.\n" \
+            "- Match your response depth to the complexity of the question. Simple question = concise answer. Deep question = comprehensive answer with boards.\n\n" \
+            "FORMATTING RULES (when you DO use boards):\n" \
+            "1. <math_board>...</math_board>: Pure, valid LaTeX only. Use \\\\begin{aligned} ... \\\\end{aligned} for multi-line derivations. Wrap step titles in \\\\text{Step 1: ...}. NEVER put plain English outside \\\\text{} inside <math_board>.\n" \
+            "2. <diagram_board>...</diagram_board>: Valid Mermaid.js syntax only.\n" \
+            "3. <simulation_board>...</simulation_board>: Detailed Plotly specification that will produce a RICH, FULL-CANVAS visualization. Describe the physics to simulate with enough detail that the resulting plot is meaningful, properly scaled, and visually impressive."
 
         if media_filenames:
             system_guardrails += f"\n\n[SESSION MEDIA VAULT: The student has uploaded the following course materials/PDFs for this session: {', '.join(media_filenames)}. Use these specific documents to guide your pedagogical explanations, problems, and derivations whenever relevant.]"

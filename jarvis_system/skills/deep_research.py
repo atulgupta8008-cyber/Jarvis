@@ -113,14 +113,16 @@ async def deep_research_protocol(query: str, session_id: str, history: list, dos
         "role": "user", 
         "parts": [
             f"[SYSTEM GUARDRAILS: {dossier}]\n\n"
-            f"STRICT OUTPUT CONSTRAINT:\n"
-            f"1. Use the <math_board>...</math_board> tag exclusively for long, multi-step calculus or derivations written in standard LaTeX.\n"
-            f"2. Use the <diagram_board>...</diagram_board> tag exclusively for free-body diagrams, system architectures, or flowcharts written in Mermaid.js syntax.\n"
-            f"3. Use the <simulation_board>...</simulation_board> tag exclusively to prompt the physics engine to generate a 3D visualization using Plotly/Three.js.\n\n"
-            f"Think deeply. Provide exhaustive, step-by-step derivations on the blackboard. Use simulations liberally to demonstrate complex systems. Never use these tags for normal conversation."
+            f"OUTPUT INTELLIGENCE RULES:\n"
+            f"BLACKBOARD USAGE — THINK BEFORE YOU DRAW:\n"
+            f"Use blackboard tools ONLY when they genuinely deepen understanding of the researched topic.\n\n"
+            f"- <math_board>: Use when the research requires derivations, proofs, or equations essential to understanding. Pure LaTeX only, use \\begin{{aligned}} for multi-line.\n"
+            f"- <diagram_board>: Use when system architecture, causal chains, or process flows genuinely clarify the research. Valid Mermaid.js only.\n"
+            f"- <simulation_board>: Use ONLY when the research involves dynamic behavior that MUST be visualized (trajectories, fields, phase transitions). Provide detailed Plotly specs for a rich, full-canvas visualization. Do NOT generate simulations for concepts that don't benefit from visualization.\n\n"
+            f"Match your response depth to the complexity of the topic. Use boards surgically, not reflexively."
         ]
     })
-    messages.append({"role": "model", "parts": ["Understood. I will adhere to the Socratic guardrails and strict output formatting."]})
+    messages.append({"role": "model", "parts": ["Understood. I will adhere to the pedagogical guardrails and use blackboard tools only when they genuinely enhance understanding."]})
     
     # Inject minimal history context
     last_role = "model"
