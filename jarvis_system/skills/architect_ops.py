@@ -123,7 +123,23 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
     messages = []
     
     # Inject Dossier as system instruction equivalent
-    messages.append({"role": "user", "parts": [f"[SYSTEM GUARDRAILS: {ARCHITECT_PROMPTS.get(difficulty, ARCHITECT_PROMPTS['curious_kid'])}{SCORING_INSTRUCTION}]\n\nOUTPUT INTELLIGENCE RULES:\nBLACKBOARD USAGE — THINK BEFORE YOU DRAW:\nYou have access to 3 powerful blackboard tools. Use them ONLY when they genuinely help clarify the student's teaching, NOT reflexively on every response.\n\n- <math_board>: Use ONLY when the student's explanation involves equations or you need to show the correct derivation. NOT for greetings or conceptual chat.\n- <diagram_board>: Use ONLY when a system architecture, flowchart, or causal diagram genuinely clarifies the topic. NOT for simple topics.\n- <simulation_board>: Use ONLY when the concept involves dynamic behavior that MUST be visualized (trajectories, waves, fields). NOT for greetings, definitions, or when a static equation suffices.\n\nCONVERSATIONAL INTELLIGENCE:\n- If the student greets you or makes small talk: respond naturally. Do NOT generate any boards.\n- Match your response depth to the complexity of their explanation. Simple input = concise response. Deep teaching = comprehensive feedback with boards.\n\nFORMATTING (when you DO use boards):\n1. <math_board>: Pure LaTeX only. Use \\\\begin{aligned} ... \\\\end{aligned} for multi-line.\n2. <diagram_board>: Valid Mermaid.js syntax only.\n3. <simulation_board>: Detailed Plotly specification for a rich, full-canvas visualization."]})
+    guardrails_text = f"[SYSTEM GUARDRAILS: {ARCHITECT_PROMPTS.get(difficulty, ARCHITECT_PROMPTS['curious_kid'])}{SCORING_INSTRUCTION}]"
+    output_rules = (
+        "\n\nOUTPUT INTELLIGENCE RULES:\n"
+        "BLACKBOARD USAGE — THINK BEFORE YOU DRAW:\n"
+        "You have access to 3 powerful blackboard tools. Use them ONLY when they genuinely help clarify the student's teaching, NOT reflexively on every response.\n\n"
+        "- <math_board>: Use ONLY when the student's explanation involves equations or you need to show the correct derivation. NOT for greetings or conceptual chat.\n"
+        "- <diagram_board>: Use ONLY when a system architecture, flowchart, or causal diagram genuinely clarifies the topic. NOT for simple topics.\n"
+        "- <simulation_board>: Use ONLY when the concept involves dynamic behavior that MUST be visualized (trajectories, waves, fields). NOT for greetings, definitions, or when a static equation suffices.\n\n"
+        "CONVERSATIONAL INTELLIGENCE:\n"
+        "- If the student greets you or makes small talk: respond naturally. Do NOT generate any boards.\n"
+        "- Match your response depth to the complexity of their explanation. Simple input = concise response. Deep teaching = comprehensive feedback with boards.\n\n"
+        "FORMATTING (when you DO use boards):\n"
+        "1. <math_board>: Pure LaTeX only. Use \\begin{aligned} ... \\end{aligned} for multi-line.\n"
+        "2. <diagram_board>: Valid Mermaid.js syntax only.\n"
+        "3. <simulation_board>: Detailed Plotly specification for a rich, full-canvas visualization."
+    )
+    messages.append({"role": "user", "parts": [guardrails_text + output_rules]})
     messages.append({"role": "model", "parts": ["Understood. I will act as Young Jarvis and adhere to the strict output formatting."]})
 
     # Inject History safely (ensure alternating roles and no empty parts)
