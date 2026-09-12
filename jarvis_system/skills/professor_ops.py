@@ -199,77 +199,69 @@ async def handle_professor_query(
     master_prompt = TEACHING_STYLE_PROMPTS.get(learning_style, SOCRATIC_PROFESSOR_PROMPT)
     dossier = master_prompt
     
+    # Build Comprehensive System Guardrails for both standard and Deep Research modes
+    system_guardrails = f"[SYSTEM GUARDRAILS: {dossier}]"
+    if is_epiphany_mode:
+        act_num = 1
+        if len(history) >= 4: act_num = 3
+        elif len(history) >= 2: act_num = 2
+        system_guardrails += f"\n\n{TIME_MACHINE_PROMPT}\n[CURRENT PROGRESS: You are currently on ACT {act_num}. You MUST append [ACT:{act_num}] on a new line at the very end of your response.]"
+    if is_collider_mode:
+        system_guardrails += f"\n\n{COLLIDER_PROMPT_OVERRIDE}"
+
+    user_lang = (user_profile.get("language") if user_profile else "English") or "English"
+    if user_lang == "Hinglish":
+        lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in natural, conversational Hinglish (Hindi written in Roman/English alphabet blended with technical English words, e.g. 'Dekho, first principles se samjhte hain...')."
+    else:
+        lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in simple English."
+    system_guardrails += f"\n\n[{lang_directive}]"
+
+    if user_profile:
+        name = "Atul" if role == "admin" else (user_profile.get("display_name") or "Scholar")
+        subs = ", ".join(user_profile.get("interested_subjects", ["Physics", "Mathematics"])) if isinstance(user_profile.get("interested_subjects"), list) else str(user_profile.get("interested_subjects", ""))
+        system_guardrails += f"\n\n[ACTIVE LEARNER: Name: {name} | Preferred Language: {user_lang} | Teaching Style: {learning_style} | Subject Interests: {subs}]"
+
+    system_guardrails += "\n\nOUTPUT INTELLIGENCE RULES:\n" \
+        "BLACKBOARD USAGE — THINK BEFORE YOU DRAW:\n" \
+        "You have access to 3 powerful blackboard tools. Use them ONLY when they genuinely deepen understanding. Do NOT use them reflexively or on every response.\n\n" \
+        "WHEN TO USE <math_board>:\n" \
+        "- The student explicitly asks for a derivation, proof, or mathematical breakdown\n" \
+        "- The concept fundamentally requires equations to be understood (e.g. Maxwell's equations, Schrödinger equation)\n" \
+        "- You are walking through a multi-step calculation or showing how one equation leads to another\n" \
+        "WHEN NOT TO USE <math_board>: Greetings, conceptual explanations that don't need math, follow-up questions, casual discussion, or when the student is asking a simple factual question\n\n" \
+        "WHEN TO USE <simulation_board>:\n" \
+        "- The concept involves dynamic behavior that is dramatically easier to understand visually (trajectories, wave propagation, field lines, phase transitions, orbital mechanics)\n" \
+        "- The student explicitly asks to 'see', 'visualize', or 'simulate' something\n" \
+        "- A parameter sweep or comparative visualization would reveal non-obvious physics\n" \
+        "WHEN NOT TO USE <simulation_board>: Greetings, simple definitions, conceptual Q&A, derivations that don't benefit from animation, or when a static equation is sufficient\n\n" \
+        "WHEN TO USE <diagram_board>:\n" \
+        "- System architecture, causal chains, free-body diagrams, or process flows that clarify relationships\n" \
+        "WHEN NOT TO USE <diagram_board>: Simple linear explanations, greetings, or when the relationship is obvious from text\n\n" \
+        "CONVERSATIONAL INTELLIGENCE:\n" \
+        "- If the student says hello, greets you, or makes small talk: respond naturally and warmly like a real professor. Do NOT generate any blackboard content.\n" \
+        "- If the student asks a simple factual question (e.g. 'What is entropy?'): give a clear, eloquent explanation. Only add <math_board> if the defining equation is essential.\n" \
+        "- If the student asks a deep conceptual question or requests a derivation: THEN unleash the full blackboard arsenal.\n" \
+        "- Match your response depth to the complexity of the question. Simple question = concise answer. Deep question = comprehensive answer with boards.\n\n" \
+        "FORMATTING RULES (when you DO use boards):\n" \
+        "1. <math_board>...</math_board>: Pure, valid LaTeX only. Use \\\\begin{aligned} ... \\\\end{aligned} for multi-line derivations. Wrap step titles in \\\\text{Step 1: ...}. NEVER put plain English outside \\\\text{} inside <math_board>.\n" \
+        "2. <diagram_board>...</diagram_board>: Valid Mermaid.js syntax only.\n" \
+        "3. <simulation_board>...</simulation_board>: Detailed Plotly specification that will produce a RICH, FULL-CANVAS visualization. Describe the physics to simulate with enough detail that the resulting plot is meaningful, properly scaled, and visually impressive."
+
+    if media_filenames:
+        system_guardrails += f"\n\n[SESSION MEDIA VAULT: The student has uploaded the following course materials/PDFs for this session: {', '.join(media_filenames)}. Use these specific documents to guide your pedagogical explanations, problems, and derivations whenever relevant.]"
+
     # 2.5: Branch to Deep Research if requested
     if deep_research and send_ui_update is not None:
-        effective_dossier = dossier
-        if is_epiphany_mode:
-            effective_dossier += "\n\n" + TIME_MACHINE_PROMPT
-        if is_collider_mode:
-            effective_dossier += "\n\n" + COLLIDER_PROMPT_OVERRIDE
-
         response_text, math_board, diagram_board, simulation_board = await deep_research_protocol(
             query=text if text.strip() else "[File Attached]",
             session_id=session_id,
             history=history,
-            dossier=effective_dossier,
+            dossier=system_guardrails,
             send_ui_update=send_ui_update
         )
     else:
         # Formulate Gemini Payload
         messages = []
-
-        # Inject Dossier and optional Epiphany/Collider Overrides as system instruction equivalent
-        system_guardrails = f"[SYSTEM GUARDRAILS: {dossier}]"
-        if is_epiphany_mode:
-            # Determine act progression
-            act_num = 1
-            if len(history) >= 4: act_num = 3
-            elif len(history) >= 2: act_num = 2
-            system_guardrails += f"\n\n{TIME_MACHINE_PROMPT}\n[CURRENT PROGRESS: You are currently on ACT {act_num}. You MUST append [ACT:{act_num}] on a new line at the very end of your response.]"
-        if is_collider_mode:
-            system_guardrails += f"\n\n{COLLIDER_PROMPT_OVERRIDE}"
-
-        user_lang = (user_profile.get("language") if user_profile else "English") or "English"
-        if user_lang == "Hinglish":
-            lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in natural, conversational Hinglish (Hindi written in Roman/English alphabet blended with technical English words, e.g. 'Dekho, first principles se samjhte hain...')."
-        else:
-            lang_directive = "LANGUAGE DIRECTIVE: You MUST speak in simple English."
-        system_guardrails += f"\n\n[{lang_directive}]"
-
-        if user_profile:
-            name = "Atul" if role == "admin" else (user_profile.get("display_name") or "Scholar")
-            subs = ", ".join(user_profile.get("interested_subjects", ["Physics", "Mathematics"])) if isinstance(user_profile.get("interested_subjects"), list) else str(user_profile.get("interested_subjects", ""))
-            system_guardrails += f"\n\n[ACTIVE LEARNER: Name: {name} | Preferred Language: {user_lang} | Teaching Style: {learning_style} | Subject Interests: {subs}]"
-
-        system_guardrails += "\n\nOUTPUT INTELLIGENCE RULES:\n" \
-            "BLACKBOARD USAGE — THINK BEFORE YOU DRAW:\n" \
-            "You have access to 3 powerful blackboard tools. Use them ONLY when they genuinely deepen understanding. Do NOT use them reflexively or on every response.\n\n" \
-            "WHEN TO USE <math_board>:\n" \
-            "- The student explicitly asks for a derivation, proof, or mathematical breakdown\n" \
-            "- The concept fundamentally requires equations to be understood (e.g. Maxwell's equations, Schrödinger equation)\n" \
-            "- You are walking through a multi-step calculation or showing how one equation leads to another\n" \
-            "WHEN NOT TO USE <math_board>: Greetings, conceptual explanations that don't need math, follow-up questions, casual discussion, or when the student is asking a simple factual question\n\n" \
-            "WHEN TO USE <simulation_board>:\n" \
-            "- The concept involves dynamic behavior that is dramatically easier to understand visually (trajectories, wave propagation, field lines, phase transitions, orbital mechanics)\n" \
-            "- The student explicitly asks to 'see', 'visualize', or 'simulate' something\n" \
-            "- A parameter sweep or comparative visualization would reveal non-obvious physics\n" \
-            "WHEN NOT TO USE <simulation_board>: Greetings, simple definitions, conceptual Q&A, derivations that don't benefit from animation, or when a static equation is sufficient\n\n" \
-            "WHEN TO USE <diagram_board>:\n" \
-            "- System architecture, causal chains, free-body diagrams, or process flows that clarify relationships\n" \
-            "WHEN NOT TO USE <diagram_board>: Simple linear explanations, greetings, or when the relationship is obvious from text\n\n" \
-            "CONVERSATIONAL INTELLIGENCE:\n" \
-            "- If the student says hello, greets you, or makes small talk: respond naturally and warmly like a real professor. Do NOT generate any blackboard content.\n" \
-            "- If the student asks a simple factual question (e.g. 'What is entropy?'): give a clear, eloquent explanation. Only add <math_board> if the defining equation is essential.\n" \
-            "- If the student asks a deep conceptual question or requests a derivation: THEN unleash the full blackboard arsenal.\n" \
-            "- Match your response depth to the complexity of the question. Simple question = concise answer. Deep question = comprehensive answer with boards.\n\n" \
-            "FORMATTING RULES (when you DO use boards):\n" \
-            "1. <math_board>...</math_board>: Pure, valid LaTeX only. Use \\\\begin{aligned} ... \\\\end{aligned} for multi-line derivations. Wrap step titles in \\\\text{Step 1: ...}. NEVER put plain English outside \\\\text{} inside <math_board>.\n" \
-            "2. <diagram_board>...</diagram_board>: Valid Mermaid.js syntax only.\n" \
-            "3. <simulation_board>...</simulation_board>: Detailed Plotly specification that will produce a RICH, FULL-CANVAS visualization. Describe the physics to simulate with enough detail that the resulting plot is meaningful, properly scaled, and visually impressive."
-
-        if media_filenames:
-            system_guardrails += f"\n\n[SESSION MEDIA VAULT: The student has uploaded the following course materials/PDFs for this session: {', '.join(media_filenames)}. Use these specific documents to guide your pedagogical explanations, problems, and derivations whenever relevant.]"
-
         messages.append({"role": "user", "parts": [system_guardrails]})
         messages.append({"role": "model", "parts": [f"Understood. I will adhere to the {learning_style} pedagogy guardrails, Epiphany Mode rules, Collider Mode rules (if engaged), and strict output formatting."]})
 
