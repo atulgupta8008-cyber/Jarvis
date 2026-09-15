@@ -74,7 +74,7 @@ async def handle_sandbox_query(session_id: str, text: str, send_ui_update=None) 
     ]
     def _generate():
         return client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.5-flash-lite",
             contents=formatted_contents,
             config=genai.types.GenerateContentConfig(max_output_tokens=8192)
         )

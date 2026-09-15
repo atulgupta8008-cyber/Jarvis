@@ -104,7 +104,7 @@ async def simulate_physics(prompt: str) -> str:
     
     try:
         response = await gemini_client.chat.completions.create(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.5-flash-lite",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}

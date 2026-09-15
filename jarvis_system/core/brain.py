@@ -199,7 +199,7 @@ class JarvisBrain:
             return AsyncOpenAI(
                 api_key=config.GEMINI_API_KEY,
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-            ), "gemini-3.1-flash-lite", "Gemini Deep Think Core"
+            ), "gemini-3.5-flash-lite", "Gemini Deep Think Core"
         else:
             return AsyncGroq(api_key=config.GROQ_API_KEY), "llama-3.1-8b-instant", "Groq Fast Core"
 

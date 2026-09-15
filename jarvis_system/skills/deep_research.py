@@ -134,7 +134,7 @@ async def deep_research_protocol(query: str, session_id: str, history: list, dos
 
         def _direct_reply():
             return client.models.generate_content(
-                model="gemini-3.1-flash-lite",
+                model="gemini-3.5-flash-lite",
                 contents=formatted_contents,
                 config=genai.types.GenerateContentConfig(max_output_tokens=1024)
             )
@@ -177,7 +177,7 @@ Do not return any explanations, markdown text, or other wrappers outside the JSO
     try:
         def _plan():
             return client.models.generate_content(
-                model="gemini-3.1-flash-lite",
+                model="gemini-3.5-flash-lite",
                 contents=planner_prompt,
                 config=genai.types.GenerateContentConfig(temperature=0.2)
             )
@@ -268,7 +268,7 @@ Do not return any explanations, markdown text, or other wrappers outside the JSO
 
     def _synthesize():
         return client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.5-flash-lite",
             contents=formatted_contents,
             config=genai.types.GenerateContentConfig(max_output_tokens=8192)
         )

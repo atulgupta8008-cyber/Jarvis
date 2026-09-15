@@ -138,7 +138,7 @@ No markdown, no explanation, just the JSON array."""
     try:
         def _generate():
             return client.models.generate_content(
-                model="gemini-3.1-flash-lite",
+                model="gemini-3.5-flash-lite",
                 contents=prompt
             )
         response = await asyncio.wait_for(asyncio.to_thread(_generate), timeout=7.0)

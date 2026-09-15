@@ -189,7 +189,7 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
     def _generate():
         if send_ui_update:
             response = client.models.generate_content_stream(
-                model="gemini-3.1-flash-lite",
+                model="gemini-3.5-flash-lite",
                 contents=formatted_contents,
                 config=genai.types.GenerateContentConfig(max_output_tokens=8192)
             )
@@ -203,7 +203,7 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
             return full_text
         else:
             response = client.models.generate_content(
-                model="gemini-3.1-flash-lite",
+                model="gemini-3.5-flash-lite",
                 contents=formatted_contents,
                 config=genai.types.GenerateContentConfig(max_output_tokens=8192)
             )
@@ -271,7 +271,7 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
             try:
                 def _gen_title():
                     return client.models.generate_content(
-                        model="gemini-3.1-flash-lite",
+                        model="gemini-3.5-flash-lite",
                         contents=f"Summarize this query into a short 3 to 5 word title. Only return the title, no quotes or preamble:\n{text[:500]}"
                     )
                 title_res = await asyncio.to_thread(_gen_title)

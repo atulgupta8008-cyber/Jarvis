@@ -96,7 +96,7 @@ async def generate_for_agent(agent_prompt: str, history: list, text: str, upload
 
     def _generate():
         return client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.5-flash-lite",
             contents=formatted_contents,
             config=genai.types.GenerateContentConfig(max_output_tokens=8192)
         )
@@ -210,7 +210,7 @@ async def handle_study_group_query(
             try:
                 def _gen_title():
                     return client.models.generate_content(
-                        model="gemini-3.1-flash-lite",
+                        model="gemini-3.5-flash-lite",
                         contents=f"Summarize this query into a short 3 to 5 word title. Only return the title, no quotes or preamble:\n{text[:500]}"
                     )
                 title_res = await asyncio.to_thread(_gen_title)

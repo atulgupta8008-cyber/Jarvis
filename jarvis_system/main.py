@@ -614,7 +614,7 @@ async def jarvis_processing_loop():
                         messages.append({"role": "user", "content": args.get("task_description", "")})
                         
                         try:
-                            resp = await gemini_client.chat.completions.create(model="gemini-2.5-flash", messages=messages, temperature=0.5)
+                            resp = await gemini_client.chat.completions.create(model="gemini-3.8-flash", messages=messages, temperature=0.5)
                             context_data = resp.choices[0].message.content
                         except Exception as e:
                             context_data = f"Gemini Core failed: {e}"
