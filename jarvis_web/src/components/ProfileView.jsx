@@ -33,7 +33,7 @@ const LEARNING_STYLES = [
   'Simulation-First'
 ];
 
-export default function ProfileView({ onExit, onClose }) {
+export default function ProfileView({ onExit, onClose, onOpenAdmin }) {
   const { user, profile, isAdmin, updateProfile, signOut, deleteAccount } = useAuth();
   const handleBack = onExit || onClose;
 
@@ -106,6 +106,29 @@ export default function ProfileView({ onExit, onClose }) {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {isAdmin && onOpenAdmin && (
+            <button 
+              onClick={onOpenAdmin}
+              style={{
+                background: 'rgba(255, 209, 101, 0.15)',
+                border: '1px solid rgba(255, 209, 101, 0.4)',
+                color: '#ffd165',
+                padding: '8px 14px',
+                borderRadius: 8,
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 209, 101, 0.25)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 209, 101, 0.15)'}
+            >
+              <Shield size={14} /> Open Admin Console
+            </button>
+          )}
           {!isAdmin && (
             <button 
               onClick={() => setShowDeleteConfirm(true)}

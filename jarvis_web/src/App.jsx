@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Send, Activity, Radio, Cpu, Sparkles, MessageSquare, User } from 'lucide-react';
+import { Layers, Send, Activity, Radio, Cpu, Sparkles, MessageSquare, User, Shield } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import InfinityCore from './components/InfinityCore';
 import ChatPanel from './components/ChatPanel';
@@ -453,6 +453,30 @@ function AppContent() {
             </div>
 
             <div className="assistant-header-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => applyRoute('admin')}
+                  title="Open Admin Console"
+                  style={{
+                    background: 'rgba(255, 209, 101, 0.12)',
+                    border: '1px solid rgba(255, 209, 101, 0.35)',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    color: '#ffd165',
+                    fontFamily: 'DM Mono, monospace',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Shield size={13} style={{ color: '#ffd165' }} />
+                  <span>Admin Console</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleOpenProfile}
@@ -547,7 +571,13 @@ function AppContent() {
 
       {/* Profile Management View */}
       {isProfileOpen && (
-        <ProfileView onClose={() => setIsProfileOpen(false)} />
+        <ProfileView 
+          onClose={() => setIsProfileOpen(false)} 
+          onOpenAdmin={() => {
+            setIsProfileOpen(false);
+            applyRoute('admin');
+          }}
+        />
       )}
 
       {/* Authentication and Onboarding Modals */}

@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import {
   ArrowDownRight, ArrowRight, Bot, BrainCircuit, Compass,
-  Cpu, Mic, Orbit, ShieldCheck, Sparkles, Users, Menu, X,
+  Cpu, Mic, Orbit, Shield, ShieldCheck, Sparkles, Users, Menu, X,
   Layers, Zap, BookOpen, FlaskConical, HelpCircle, Flame, MessageSquare
 } from 'lucide-react';
 import OrbitalCore from './OrbitalCore';
@@ -164,6 +164,29 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
             </div>
             <span>{isAdmin ? 'Admin' : (user ? (profile?.display_name || 'Profile') : 'Sign In')}</span>
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => go('admin')}
+              title="Open Admin Console"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                background: 'rgba(255, 209, 101, 0.12)',
+                border: '1px solid rgba(255, 209, 101, 0.35)',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                color: '#ffd165',
+                fontFamily: 'DM Mono, monospace',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Shield size={13} style={{ color: '#ffd165' }} />
+              <span>Admin Console</span>
+            </button>
+          )}
           <button className="btn-launch" onClick={() => go('professor')}>Open Jarvis <ArrowRight size={14} /></button>
           <button className="mobile-menu-toggle" onClick={() => setMobileMenu(true)} aria-label="Menu"><Menu size={22} /></button>
         </div>
@@ -192,9 +215,20 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
             >
               Feedback & Signals
             </motion.button>
+            {isAdmin && (
+              <motion.button className="mob-link"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.32 }}
+                onClick={() => { setMobileMenu(false); go('admin'); }}
+                style={{ color: '#ffd165', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600 }}
+              >
+                <Shield size={16} />
+                <span>Admin Console</span>
+              </motion.button>
+            )}
             <motion.button className="mob-link"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.33 }}
+              transition={{ delay: 0.34 }}
               onClick={() => { setMobileMenu(false); onOpenProfile?.(); }}
               style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             >
