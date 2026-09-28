@@ -764,6 +764,31 @@ def update_settings(settings: SettingsModel, request: Request):
     api_config.update_settings(settings.dict())
     return {"status": "success", "settings": api_config.public_settings()}
 
+# --- ADMIN DASHBOARD API ---
+ADMIN_KEYS = {"jarvis-admin-777", "atul8008", "admin"}
+
+def verify_admin(admin_key: str = None):
+    if not admin_key or admin_key not in ADMIN_KEYS:
+        raise HTTPException(status_code=403, detail="Unauthorized: Invalid admin key")
+
+@app.get("/api/admin/users")
+async def admin_get_users(admin_key: str = None):
+    verify_admin(admin_key)
+    users = await professor_ops.cloud_engine.admin_fetch_all_users()
+    return {"users": users}
+
+@app.get("/api/admin/users/{user_id}/sessions")
+async def admin_get_user_sessions(user_id: str, admin_key: str = None):
+    verify_admin(admin_key)
+    sessions = await professor_ops.cloud_engine.admin_fetch_user_sessions(user_id)
+    return {"sessions": sessions}
+
+@app.get("/api/admin/sessions/{session_id}/messages")
+async def admin_get_session_messages(session_id: str, admin_key: str = None):
+    verify_admin(admin_key)
+    messages = await professor_ops.cloud_engine.admin_fetch_session_messages(session_id)
+    return {"messages": messages}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     origin = websocket.headers.get("origin")

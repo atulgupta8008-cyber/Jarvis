@@ -537,5 +537,59 @@ class SocraticCloudEngine:
                     pass
         await asyncio.to_thread(_delete)
 
+    async def admin_fetch_all_users(self):
+        """Fetches all user profiles with their session counts for admin dashboard."""
+        if not self.client:
+            return []
+        try:
+            # Fetch all user profiles
+            result = self.client.table("user_profiles").select("*").order("created_at", desc=True).execute()
+            users = result.data or []
+            
+            # For each user, get session count
+            for user in users:
+                try:
+                    sessions_result = self.client.table("chat_sessions").select("id", count="exact").eq("user_id", user["id"]).execute()
+                    user["session_count"] = sessions_result.count or 0
+                except:
+                    user["session_count"] = 0
+            
+            return users
+        except Exception as e:
+            print(f"[Admin] Error fetching users: {e}")
+            return []
+
+    async def admin_fetch_user_sessions(self, user_id: str):
+        """Fetches all sessions for a specific user with message counts."""
+        if not self.client:
+            return []
+        try:
+            result = self.client.table("chat_sessions").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
+            sessions = result.data or []
+            
+            for session in sessions:
+                try:
+                    msg_result = self.client.table("chat_messages").select("id", count="exact").eq("session_id", session["id"]).execute()
+                    session["message_count"] = msg_result.count or 0
+                except:
+                    session["message_count"] = 0
+            
+            return sessions
+        except Exception as e:
+            print(f"[Admin] Error fetching sessions for {user_id}: {e}")
+            return []
+
+    async def admin_fetch_session_messages(self, session_id: str):
+        """Fetches all messages for a specific session."""
+        if not self.client:
+            return []
+        try:
+            clean_sid = self._clean_session_id(session_id)
+            result = self.client.table("chat_messages").select("*").eq("session_id", clean_sid).order("created_at", desc=False).execute()
+            return result.data or []
+        except Exception as e:
+            print(f"[Admin] Error fetching messages for session {session_id}: {e}")
+            return []
+
 # Singleton instance
 cloud_engine = SocraticCloudEngine()

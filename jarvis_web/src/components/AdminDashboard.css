@@ -1,0 +1,472 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Space+Grotesk:wght@300..700&display=swap');
+
+:root {
+  --admin-bg: #030508;
+  --admin-glass-bg: rgba(255, 255, 255, 0.03);
+  --admin-glass-border: rgba(255, 255, 255, 0.08);
+  --admin-text-primary: #f4f7ff;
+  --admin-text-muted: #8994ad;
+  --admin-cyan: #6ef6f7;
+  --admin-violet: #a996ff;
+  --admin-amber: #ffd165;
+  --admin-emerald: #34d399;
+  --admin-rose: #ff9db8;
+  --admin-font-body: 'Space Grotesk', sans-serif;
+  --admin-font-mono: 'DM Mono', monospace;
+}
+
+/* 1. Dashboard Wrapper */
+.admin-dashboard {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  background-color: var(--admin-bg);
+  overflow-y: auto;
+  font-family: var(--admin-font-body);
+  color: var(--admin-text-primary);
+}
+
+.admin-dashboard::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.admin-dashboard::-webkit-scrollbar-track {
+  background: var(--admin-bg);
+}
+.admin-dashboard::-webkit-scrollbar-thumb {
+  background: var(--admin-glass-border);
+  border-radius: 3px;
+}
+.admin-dashboard::-webkit-scrollbar-thumb:hover {
+  background: var(--admin-text-muted);
+}
+
+/* 2. Header */
+.admin-header {
+  position: sticky;
+  top: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(16px, 3vw, 40px);
+  border-bottom: 1px solid var(--admin-glass-border);
+  background: rgba(3, 5, 8, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 100;
+}
+
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-back-btn {
+  background: var(--admin-glass-bg);
+  border: 1px solid var(--admin-glass-border);
+  color: var(--admin-text-primary);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-family: var(--admin-font-mono);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-back-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--admin-cyan);
+  box-shadow: 0 0 10px rgba(110, 246, 247, 0.2);
+}
+
+.admin-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.admin-header-right {
+  font-family: var(--admin-font-mono);
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+}
+
+/* 3. Breadcrumb */
+.admin-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px clamp(16px, 3vw, 40px);
+  font-family: var(--admin-font-mono);
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-breadcrumb-link {
+  color: var(--admin-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.admin-breadcrumb-link:hover {
+  color: var(--admin-cyan);
+}
+
+.admin-breadcrumb-current {
+  color: var(--admin-text-primary);
+  pointer-events: none;
+}
+
+.admin-breadcrumb::after,
+.admin-breadcrumb > *::after {
+  content: '>';
+  margin-left: 8px;
+  opacity: 0.5;
+}
+.admin-breadcrumb-current::after,
+.admin-breadcrumb > *:last-child::after {
+  content: none;
+}
+
+/* 4. Content Area */
+.admin-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 3vw, 40px);
+}
+
+/* 5. Search Bar */
+.admin-search-bar {
+  width: 100%;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.admin-search-bar input {
+  width: 100%;
+  background: var(--admin-glass-bg);
+  border: 1px solid var(--admin-glass-border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--admin-text-primary);
+  font-family: var(--admin-font-body);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-sizing: border-box;
+}
+
+.admin-search-bar input::placeholder {
+  color: var(--admin-text-muted);
+}
+
+.admin-search-bar input:focus {
+  outline: none;
+  border-color: var(--admin-cyan);
+  box-shadow: 0 0 15px rgba(110, 246, 247, 0.15);
+}
+
+/* 6. Stats Row */
+.admin-stats-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.admin-stat-card {
+  flex: 1;
+  min-width: 200px;
+  background: var(--admin-glass-bg);
+  border: 1px solid var(--admin-glass-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.admin-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--admin-cyan);
+  margin-bottom: 4px;
+}
+
+.admin-stat-label {
+  font-family: var(--admin-font-mono);
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* 7. Data Table */
+.admin-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--admin-glass-bg);
+  border-radius: 12px;
+  border: 1px solid var(--admin-glass-border);
+  overflow: hidden;
+}
+
+.admin-table thead th {
+  position: sticky;
+  top: 64px;
+  background: rgba(3, 5, 8, 0.95);
+  padding: 12px 16px;
+  text-align: left;
+  font-family: var(--admin-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-muted);
+  border-bottom: 1px solid var(--admin-glass-border);
+  z-index: 10;
+}
+
+.admin-table tbody tr {
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-table tbody td {
+  padding: 14px 16px;
+  font-size: 0.85rem;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 8. Mode Badges */
+.admin-mode-badge {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-family: var(--admin-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.mode-professor {
+  background: rgba(110, 246, 247, 0.1);
+  color: var(--admin-cyan);
+}
+.mode-architect {
+  background: rgba(169, 150, 255, 0.1);
+  color: var(--admin-violet);
+}
+.mode-study_group {
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--admin-emerald);
+}
+.mode-sandbox {
+  background: rgba(255, 209, 101, 0.1);
+  color: var(--admin-amber);
+}
+.mode-assistant {
+  background: rgba(255, 157, 184, 0.1);
+  color: var(--admin-rose);
+}
+
+/* 9. Role Badges */
+.admin-role-badge {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-family: var(--admin-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.role-admin {
+  background: rgba(255, 209, 101, 0.15);
+  color: var(--admin-amber);
+}
+.role-user {
+  background: rgba(137, 148, 173, 0.15);
+  color: var(--admin-text-muted);
+}
+
+/* 10. Message List (Transcript View) */
+.admin-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.admin-message-item {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--admin-glass-bg);
+  border: 1px solid var(--admin-glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.admin-message-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--admin-font-mono);
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+  margin-bottom: 8px;
+}
+
+.admin-message-role {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--admin-text-primary);
+  text-transform: uppercase;
+}
+
+.admin-message-role::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.msg-role-user .admin-message-role::before { background-color: var(--admin-cyan); }
+.msg-role-jarvis .admin-message-role::before { background-color: var(--admin-violet); }
+.msg-role-young_jarvis .admin-message-role::before { background-color: var(--admin-amber); }
+.msg-role-vance .admin-message-role::before { background-color: var(--admin-rose); }
+.msg-role-ada .admin-message-role::before { background-color: var(--admin-emerald); }
+
+.admin-message-content {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--admin-text-primary);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.admin-message-score {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--admin-glass-border);
+  border-radius: 8px;
+  font-family: var(--admin-font-mono);
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-message-score span {
+  color: var(--admin-cyan);
+  font-weight: 500;
+}
+
+/* 11. Empty State */
+.admin-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+  color: var(--admin-text-muted);
+}
+
+.admin-empty-state svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+  margin-bottom: 16px;
+}
+
+.admin-empty-state p {
+  font-family: var(--admin-font-mono);
+  font-size: 0.85rem;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+/* 12. Loading State */
+.admin-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  min-height: 200px;
+}
+
+.admin-loading::after {
+  content: '';
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--admin-glass-border);
+  border-top-color: var(--admin-cyan);
+  border-radius: 50%;
+  animation: admin-spin 1s linear infinite;
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 13. Responsive */
+@media (max-width: 768px) {
+  .admin-header {
+    padding: 0 16px;
+  }
+  
+  .admin-breadcrumb {
+    padding: 12px 16px;
+  }
+
+  .admin-content {
+    padding: 16px;
+  }
+
+  .admin-stats-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .admin-stat-card {
+    width: 100%;
+  }
+
+  .admin-table thead th:nth-child(n+4),
+  .admin-table tbody td:nth-child(n+4) {
+    display: none;
+  }
+
+  .admin-table tbody td {
+    padding: 12px;
+    font-size: 0.8rem;
+  }
+}

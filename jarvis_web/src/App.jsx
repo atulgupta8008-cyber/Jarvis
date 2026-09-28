@@ -16,6 +16,7 @@ import FeedbackModal from './components/FeedbackModal';
 import AuthModal from './components/AuthModal';
 import OnboardingSurvey from './components/OnboardingSurvey';
 import ProfileView from './components/ProfileView';
+import AdminDashboard from './components/AdminDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WS_URL } from './config';
 
@@ -59,6 +60,9 @@ const getModeFromPath = (pathname, search = window.location.search) => {
   if (path === '/curiosity' || path === '/curiosity-feed') {
     return { mode: 'curiosity', question: qParam };
   }
+  if (path === '/admin' || path === '/admin-console') {
+    return { mode: 'admin', question: qParam };
+  }
   return { mode: 'nexus', question: qParam };
 };
 
@@ -70,6 +74,7 @@ const getPathFromMode = (mode, question) => {
   else if (mode === 'study-group') path = '/study-group';
   else if (mode === 'sandbox') path = '/sandbox';
   else if (mode === 'curiosity') path = '/curiosity';
+  else if (mode === 'admin') path = '/admin';
   
   if (question && mode === 'professor') {
     path += `?q=${encodeURIComponent(question)}`;
@@ -86,6 +91,7 @@ const getTitleFromMode = (mode) => {
     case 'study-group': return 'Study Group — Collaborative AI Debate | Jarvis';
     case 'sandbox': return 'Sandbox Workspace | Jarvis';
     case 'curiosity': return 'Curiosity Feed | Jarvis';
+    case 'admin': return 'Admin Console | Jarvis';
     default: return 'Jarvis AI — Personal Intelligence Platform';
   }
 };
@@ -110,6 +116,7 @@ function AppContent() {
   const [commandText, setCommandText] = useState('');
   const [curiosityHooks, setCuriosityHooks] = useState(DEFAULT_CURIOSITY_HOOKS);
   const [isCuriosityDashboardOpen, setIsCuriosityDashboardOpen] = useState(false);
+  const [isAdminDashboardActive, setIsAdminDashboardActive] = useState(false);
   const [mobileTab, setMobileTab] = useState('chat');
   const [pendingIntent, setPendingIntent] = useState(null); // { mode, question }
   const ws = useRef(null);
@@ -121,6 +128,7 @@ function AppContent() {
     setIsArchitectModeActive(mode === 'architect');
     setIsSandboxModeActive(mode === 'sandbox');
     setIsCuriosityDashboardOpen(mode === 'curiosity');
+    setIsAdminDashboardActive(mode === 'admin');
     if (question !== undefined) {
       setCuriosityQuestion(question);
     }
@@ -171,7 +179,7 @@ function AppContent() {
   // When unauthenticated user tries to access protected modes directly, redirect to nexus and prompt login
   useEffect(() => {
     if (!loading && !user) {
-      const isAnyModeActive = isProfessorModeActive || isStudyGroupModeActive || isArchitectModeActive || isSandboxModeActive || (!isNexusHubActive && !isCuriosityDashboardOpen);
+      const isAnyModeActive = isProfessorModeActive || isStudyGroupModeActive || isArchitectModeActive || isSandboxModeActive || isAdminDashboardActive || (!isNexusHubActive && !isCuriosityDashboardOpen);
       if (isAnyModeActive) {
         setShowAuthModal(true);
         applyRoute('nexus', null, false);
@@ -399,7 +407,7 @@ function AppContent() {
     setCommandText('');
   };
 
-  const isAssistantActive = !isNexusHubActive && !isProfessorModeActive && !isStudyGroupModeActive && !isArchitectModeActive && !isSandboxModeActive;
+  const isAssistantActive = !isNexusHubActive && !isProfessorModeActive && !isStudyGroupModeActive && !isArchitectModeActive && !isSandboxModeActive && !isAdminDashboardActive;
 
   return (
     <>
@@ -601,6 +609,11 @@ function AppContent() {
         {isSandboxModeActive && (
           <SandboxMode 
             onExit={handleReturnToNexus} 
+          />
+        )}
+        {isAdminDashboardActive && isAdmin && (
+          <AdminDashboard
+            onExit={handleReturnToNexus}
           />
         )}
       </AnimatePresence>
