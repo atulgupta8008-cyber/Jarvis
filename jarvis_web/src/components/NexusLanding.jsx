@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { motion, useInView, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { motion, useInView, AnimatePresence, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion';
 import {
   ArrowDownRight, ArrowRight, Bot, BrainCircuit, Compass,
   Cpu, Mic, Orbit, Shield, ShieldCheck, Sparkles, Users, Menu, X,
@@ -21,19 +21,139 @@ const FALLBACK_CURIOSITY_HOOKS = [
   { question: "What happens if you travel at the speed of light and turn on a flashlight?", category: "Relativity", difficulty: 2, hook_type: "whatif" }
 ];
 
-function Reveal({ children, className = '', delay = 0, direction = 'up' }) {
+function Reveal({ children, className = '', delay = 0, direction = 'up', scale, rotate, blur }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-10% 0px' });
   const variants = {
-    hidden: { opacity: 0, y: direction === 'up' ? 40 : direction === 'down' ? -40 : 0, x: direction === 'left' ? 40 : direction === 'right' ? -40 : 0 },
-    visible: { opacity: 1, y: 0, x: 0 }
+    hidden: { 
+      opacity: 0, 
+      y: direction === 'up' ? 40 : direction === 'down' ? -40 : 0, 
+      x: direction === 'left' ? 40 : direction === 'right' ? -40 : 0,
+      scale: scale ? 0.9 : 1,
+      rotate: rotate ? 5 : 0,
+      filter: blur ? 'blur(8px)' : 'blur(0px)'
+    },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      x: 0,
+      scale: 1,
+      rotate: 0,
+      filter: 'blur(0px)'
+    }
   };
   return (
-    <motion.div ref={ref} className={className}
+    <motion.div ref={ref} className={className + (blur ? ' blur-reveal' : '')}
       variants={variants} initial="hidden"
       animate={inView ? 'visible' : 'hidden'}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay }}
+      transition={{ type: 'spring', damping: 25, stiffness: 120, delay }}
     >{children}</motion.div>
+  );
+}
+
+function CountUp({ to, delay = 0 }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-10% 0px' });
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    let start = 0;
+    const duration = 1500;
+    const startTime = performance.now();
+    let animationFrame;
+    const animate = (time) => {
+      const elapsed = time - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      setCount(Math.floor(ease * to));
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+    const timeout = setTimeout(() => {
+      animationFrame = requestAnimationFrame(animate);
+    }, delay * 1000);
+    return () => {
+      clearTimeout(timeout);
+      cancelAnimationFrame(animationFrame);
+    };
+  }, [inView, to, delay]);
+
+  return <span ref={ref}>{count}</span>;
+}
+
+function StatValue({ value, delay }) {
+  const isNumeric = !isNaN(value);
+  if (isNumeric) {
+    return <CountUp to={parseInt(value, 10)} delay={delay} />;
+  }
+  return <span>{value}</span>;
+}
+
+function LineWipe() {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-10% 0px' });
+  return (
+    <motion.div 
+      ref={ref}
+      className="scroll-line-wipe" 
+      initial={{ scaleX: 0 }} 
+      animate={inView ? { scaleX: 1 } : { scaleX: 0 }} 
+      transition={{ duration: 0.8, ease: "easeOut" }}
+    />
+  );
+}
+
+function ModeCard({ m, i, go }) {
+  const cardRef = useRef(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  
+  const rotateX = useTransform(y, [-0.5, 0.5], [5, -5]);
+  const rotateY = useTransform(x, [-0.5, 0.5], [-5, 5]);
+  
+  const rotateXSpring = useSpring(rotateX, { stiffness: 300, damping: 30 });
+  const rotateYSpring = useSpring(rotateY, { stiffness: 300, damping: 30 });
+
+  const handleMouseMove = (e) => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const xPct = mouseX / width - 0.5;
+    const yPct = mouseY / height - 0.5;
+    x.set(xPct);
+    y.set(yPct);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <Reveal delay={i * 0.08} className={`mode-card mode-${m.color}`}>
+      <motion.div 
+        ref={cardRef}
+        className="mode-inner" 
+        onClick={() => go(m.mode)}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{ rotateX: rotateXSpring, rotateY: rotateYSpring, transformStyle: "preserve-3d" }}
+      >
+        <div className="mode-top">
+          <span className="mode-num">{m.num} / MODE</span>
+          <m.icon size={22} />
+        </div>
+        <p className="mode-eyebrow">{m.tag}</p>
+        <h3 className="mode-title">{m.title}</h3>
+        <p className="mode-desc">{m.desc}</p>
+        <div className="mode-enter">Enter mode <ArrowRight size={14} /></div>
+      </motion.div>
+    </Reveal>
   );
 }
 
@@ -81,9 +201,35 @@ const stats = [
 ];
 
 export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaunchCuriosity, onOpenCuriosityDashboard, onOpenFeedback, onOpenProfile, user, profile, isAdmin }) {
-  const [scroll, setScroll] = useState(0);
+  const containerRef = useRef(null);
+  const heroRef = useRef(null);
+  const manifestoRef = useRef(null);
+  const ctaRef = useRef(null);
+  
   const [mobileMenu, setMobileMenu] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  const { scrollYProgress } = useScroll({ container: containerRef });
+  const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
+
+  const { scrollYProgress: heroProgress } = useScroll({ 
+    target: heroRef, 
+    container: containerRef,
+    offset: ["start start", "end start"]
+  });
+  const heroY = useTransform(heroProgress, [0, 1], [0, 100]);
+  const heroOpacity = useTransform(heroProgress, [0, 1], [1, 0]);
+  const visualY = useTransform(heroProgress, [0, 1], [0, 150]);
+  const visualScale = useTransform(heroProgress, [0, 1], [1, 0.9]);
+
+  const { scrollYProgress: manifestoProgress } = useScroll({ 
+    target: manifestoRef, 
+    container: containerRef,
+    offset: ["start end", "end start"]
+  });
+  const manifestoBgY = useTransform(manifestoProgress, [0, 1], ["-10%", "10%"]);
+
+  const ctaInView = useInView(ctaRef, { once: true, margin: '-20% 0px' });
 
   const allHooks = (curiosityHooks && curiosityHooks.length > 0) ? curiosityHooks : FALLBACK_CURIOSITY_HOOKS;
 
@@ -92,11 +238,6 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
   const filteredHooks = selectedCategory === 'All' 
     ? allHooks 
     : allHooks.filter(h => h.category?.toLowerCase() === selectedCategory.toLowerCase());
-
-  const onScroll = useCallback((e) => {
-    const t = e.target;
-    setScroll(t.scrollTop / Math.max(t.scrollHeight - t.clientHeight, 1));
-  }, []);
 
   const jump = (id) => { 
     setMobileMenu(false); 
@@ -119,9 +260,9 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
   };
 
   return (
-    <div className="nexus-landing" onScroll={onScroll}>
+    <div className="nexus-landing" ref={containerRef}>
       <div className="nexus-noise" />
-      <div className="nexus-progress" style={{ transform: `scaleX(${scroll})` }} />
+      <motion.div className="nexus-progress" style={{ scaleX }} />
       
       {/* === NAVIGATION === */}
       <nav className="nexus-nav">
@@ -253,8 +394,8 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
 
       <main>
         {/* === HERO === */}
-        <section className="nexus-hero" id="top">
-          <div className="hero-copy">
+        <section className="nexus-hero" id="top" ref={heroRef}>
+          <motion.div className="hero-copy" style={{ y: heroY, opacity: heroOpacity }}>
             <motion.div className="hero-kicker"
               initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
@@ -307,9 +448,10 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
                 </button>
               ))}
             </motion.div>
-          </div>
+          </motion.div>
 
           <motion.div className="hero-visual"
+            style={{ y: visualY, scale: visualScale, opacity: heroOpacity }}
             initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.2, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
           >
@@ -326,23 +468,24 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
         {/* === STATS STRIP === */}
         <div className="stats-strip">
           {stats.map((s, i) => (
-            <Reveal key={i} className="stat-item" delay={i * 0.08}>
-              <div className="stat-value">{s.value}</div>
+            <Reveal key={i} className="stat-item" delay={i * 0.08} scale blur>
+              <div className="stat-value"><StatValue value={s.value} delay={i * 0.08} /></div>
               <div className="stat-label">{s.label}</div>
             </Reveal>
           ))}
         </div>
 
         {/* === MANIFESTO === */}
-        <section className="manifesto-section" id="mission">
-          <div className="manifesto-bg" style={{ backgroundImage: "url('/nexus/astronaut-frames/ezgif-frame-120.jpg')" }} />
+        <section className="manifesto-section" id="mission" ref={manifestoRef}>
+          <motion.div className="manifesto-bg" style={{ backgroundImage: "url('/nexus/astronaut-frames/ezgif-frame-120.jpg')", y: manifestoBgY }} />
           <div className="manifesto-overlay" />
           <div className="manifesto-grid">
-            <Reveal>
+            <Reveal direction="left" blur>
               <span className="section-tag">Why Jarvis</span>
+              <LineWipe />
               <h2 className="manifesto-h2">THE BEST WORK<br />STARTS WITH A<br /><span>BETTER QUESTION.</span></h2>
             </Reveal>
-            <Reveal className="manifesto-copy" delay={0.12}>
+            <Reveal className="manifesto-copy" delay={0.12} direction="right" blur>
               <p>Jarvis is not another tab that produces a wall of text. It is a responsive thinking environment — one place to clarify a goal, interrogate an idea, build a plan, and leave with real understanding.</p>
               <p>Traditional search gives you results. Jarvis gives you comprehension. It challenges your assumptions, maps complex systems, and simulates the real world — ensuring you master the subject.</p>
               <button className="text-link" onClick={() => jump('modes')}>Explore all modes <ArrowRight size={14} /></button>
@@ -352,24 +495,14 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
 
         {/* === MODES === */}
         <section className="modes-section" id="modes">
-          <Reveal>
+          <Reveal blur>
             <span className="section-tag">Choose your focus</span>
+            <LineWipe />
             <h2 className="modes-heading">AN INTERFACE FOR<br /><span>EVERY KIND OF THINKING.</span></h2>
           </Reveal>
           <div className="mode-grid">
             {modes.map((m, i) => (
-              <Reveal key={m.mode} delay={i * 0.08} className={`mode-card mode-${m.color}`}>
-                <div className="mode-inner" onClick={() => go(m.mode)}>
-                  <div className="mode-top">
-                    <span className="mode-num">{m.num} / MODE</span>
-                    <m.icon size={22} />
-                  </div>
-                  <p className="mode-eyebrow">{m.tag}</p>
-                  <h3 className="mode-title">{m.title}</h3>
-                  <p className="mode-desc">{m.desc}</p>
-                  <div className="mode-enter">Enter mode <ArrowRight size={14} /></div>
-                </div>
-              </Reveal>
+              <ModeCard key={m.mode} m={m} i={i} go={go} />
             ))}
           </div>
         </section>
@@ -377,8 +510,9 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
         {/* === DEDICATED CURIOSITY SHOWCASE SECTION === */}
         <section className="curiosity-section" id="curiosity">
           <div className="curiosity-container">
-            <Reveal>
+            <Reveal blur>
               <span className="section-tag">◆ Daily Curiosity Engine</span>
+              <LineWipe />
               <h2 className="curiosity-heading">
                 THE UNIVERSE IS FULL OF PARADOXES.<br />
                 <span>CHOOSE ONE TO UNRAVEL.</span>
@@ -460,8 +594,9 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
         {/* === CORE CAPABILITIES === */}
         <section className="core-section" id="core">
           <div className="core-grid">
-            <Reveal className="core-intro">
+            <Reveal className="core-intro" direction="left" blur>
               <span className="section-tag">Jarvis intelligence layer</span>
+              <LineWipe />
               <h2 className="core-heading">YOUR INTENT,<br /><span>AMPLIFIED.</span></h2>
               <p className="core-desc">Behind the interface is a powerful set of capabilities designed to turn natural language into robust workflows, deep research, and real-time computation.</p>
               <button className="btn-launch" onClick={() => go('architect')}>Plan with Architect <ArrowRight size={14} /></button>
@@ -495,9 +630,15 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
         </section>
 
         {/* === CTA === */}
-        <section className="cta-section">
-          <Reveal className="cta-inner">
-            <Orbit size={28} style={{ color: 'var(--cyan)', marginBottom: 12 }} />
+        <section className="cta-section" ref={ctaRef}>
+          <motion.div 
+            className="cta-glow"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={ctaInView ? { scale: [0.5, 1.5, 1], opacity: [0, 1, 0] } : {}}
+            transition={{ duration: 2, ease: "easeOut" }}
+          />
+          <Reveal className="cta-inner" scale blur>
+            <Orbit size={28} className={ctaInView ? "cta-orbit-float" : ""} style={{ color: 'var(--cyan)', marginBottom: 12 }} />
             <p className="cta-tag">JARVIS IS READY</p>
             <h2 className="cta-heading">BRING THE QUESTION.<br /><span>LEAVE WITH MOMENTUM.</span></h2>
             <button className="btn-launch cta-btn" onClick={() => go('professor')}>Launch Jarvis <ArrowRight size={14} /></button>

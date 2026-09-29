@@ -1226,7 +1226,68 @@
 
 /* 
  * ==========================================
- * 11. RESPONSIVE QUERIES
+ * 11. SCROLL ANIMATION ENHANCEMENTS
+ * ==========================================
+ */
+
+/* Mode cards 3D tilt */
+.mode-grid {
+  perspective: 1200px;
+}
+
+/* Horizontal line wipe */
+.scroll-line-wipe {
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--cyan), transparent);
+  margin: 16px 0 28px;
+  transform-origin: center;
+}
+
+/* Stats counter animation */
+.stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* CTA glow on scroll */
+.cta-glow {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(110, 246, 247, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Blur reveal support */
+.blur-reveal {
+  will-change: filter, opacity, transform;
+}
+
+/* Floating animation for orbit icon */
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.cta-orbit-float {
+  animation: float-gentle 3s ease-in-out infinite;
+}
+
+/* Hero parallax layers */
+.hero-copy, .hero-visual {
+  will-change: transform, opacity;
+}
+
+/* Smooth section transitions */
+.manifesto-section, .modes-section, .curiosity-section, .core-section, .cta-section {
+  will-change: auto;
+}
+
+/* 
+ * ==========================================
+ * 12. RESPONSIVE QUERIES
  * ==========================================
  */
 
