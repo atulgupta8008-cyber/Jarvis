@@ -166,6 +166,76 @@ def generate_guaranteed_fallback(prompt: str, output_html_path: str) -> bool:
 
         # Domain 1: Induction / Electromagnetism / Wire & Loop
         if any(k in p_lower for k in ['induction', 'emf', 'magnetic', 'flux', 'wire', 'loop', 'faraday', 'lorentz']):
+            if '3d' in p_lower:
+                fig_3d = go.Figure()
+                # 1. Infinite Wire along X-axis
+                x_wire = np.linspace(-1.0, 1.0, 100)
+                fig_3d.add_trace(go.Scatter3d(
+                    x=x_wire, y=np.zeros(100), z=np.zeros(100),
+                    mode='lines',
+                    name='Current Wire I (10A)',
+                    line=dict(color='#ff4757', width=8)
+                ))
+                # 2. Concentric Magnetic Field Rings around wire in YZ plane
+                for r in [0.08, 0.15, 0.25]:
+                    theta = np.linspace(0, 2 * np.pi, 50)
+                    for x_pos in [-0.3, 0.0, 0.3]:
+                        fig_3d.add_trace(go.Scatter3d(
+                            x=np.full_like(theta, x_pos),
+                            y=r * np.cos(theta),
+                            z=r * np.sin(theta),
+                            mode='lines',
+                            name=f'B-field lines (r={r}m)',
+                            showlegend=(x_pos == 0.0 and r == 0.08),
+                            line=dict(color='rgba(0, 247, 255, 0.4)', width=2, dash='dot')
+                        ))
+                # 3. Rectangular Loop at Initial Position (h = 0.1m)
+                l_dim, w_dim, h0 = 0.5, 0.2, 0.1
+                loop_x = [-l_dim / 2, l_dim / 2, l_dim / 2, -l_dim / 2, -l_dim / 2]
+                loop_y0 = [h0, h0, h0 + w_dim, h0 + w_dim, h0]
+                loop_z = [0, 0, 0, 0, 0]
+                fig_3d.add_trace(go.Scatter3d(
+                    x=loop_x, y=loop_y0, z=loop_z,
+                    mode='lines+markers',
+                    name='Loop at t=0 (h=0.1m, Peak EMF)',
+                    line=dict(color='#00f7ff', width=6),
+                    marker=dict(size=4, color='#ffffff')
+                ))
+                # 4. Rectangular Loop at Final Position (h = 0.35m)
+                h1 = 0.35
+                loop_y1 = [h1, h1, h1 + w_dim, h1 + w_dim, h1]
+                fig_3d.add_trace(go.Scatter3d(
+                    x=loop_x, y=loop_y1, z=loop_z,
+                    mode='lines+markers',
+                    name='Loop at t=5s (h=0.35m, Low EMF)',
+                    line=dict(color='#a855f7', width=5, dash='dash'),
+                    marker=dict(size=3, color='#a855f7')
+                ))
+                # 5. Velocity Vector Arrow
+                fig_3d.add_trace(go.Scatter3d(
+                    x=[0, 0], y=[h0 + w_dim / 2, h0 + w_dim / 2 + 0.12], z=[0, 0],
+                    mode='lines+markers',
+                    name='Velocity Vector v (+Y direction)',
+                    line=dict(color='#ffd166', width=5),
+                    marker=dict(symbol='diamond', size=5, color='#ffd166')
+                ))
+                fig_3d.update_layout(
+                    title='<b>3D Spatial Simulation: Conducting Loop Moving in Wire Magnetic Field</b>',
+                    scene=dict(
+                        xaxis_title='X (Parallel to Wire - m)',
+                        yaxis_title='Y (Distance from Wire - m)',
+                        zaxis_title='Z (Field Penetration - m)',
+                        bgcolor='#0a0e17',
+                        camera=dict(eye=dict(x=1.6, y=-1.4, z=1.2))
+                    ),
+                    paper_bgcolor='#0a0e17',
+                    font=dict(color='#e0e6f0', family='Space Grotesk, sans-serif'),
+                    margin=dict(l=20, r=20, t=50, b=20),
+                    height=600
+                )
+                fig_3d.write_html(output_html_path)
+                return True
+
             y = np.linspace(0.01, 0.25, 250)
             I = 10.0
             mu0 = 4 * np.pi * 1e-7
