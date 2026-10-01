@@ -14,7 +14,82 @@ const resolveSimulationUrl = (url) => {
   return url;
 };
 
-mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#0a2a2b',
+    primaryTextColor: '#6ef6f7',
+    primaryBorderColor: '#6ef6f7',
+    secondaryColor: '#1a1530',
+    secondaryTextColor: '#a996ff',
+    secondaryBorderColor: '#a996ff',
+    tertiaryColor: '#0a2b1a',
+    tertiaryTextColor: '#34d399',
+    tertiaryBorderColor: '#34d399',
+    lineColor: '#6ef6f7',
+    textColor: '#e0e6f0',
+    mainBkg: '#0a2a2b',
+    nodeBorder: '#6ef6f7',
+    clusterBkg: 'rgba(110, 246, 247, 0.05)',
+    clusterBorder: '#6ef6f7',
+    titleColor: '#f4f7ff',
+    edgeLabelBackground: '#0d1117',
+    nodeTextColor: '#e0e6f0',
+    actorBorder: '#6ef6f7',
+    actorBkg: '#0a2a2b',
+    actorTextColor: '#e0e6f0',
+    actorLineColor: '#6ef6f7',
+    signalColor: '#e0e6f0',
+    signalTextColor: '#e0e6f0',
+    labelBoxBkgColor: '#0d1117',
+    labelBoxBorderColor: '#6ef6f7',
+    labelTextColor: '#e0e6f0',
+    loopTextColor: '#a996ff',
+    noteBorderColor: '#a996ff',
+    noteBkgColor: '#1a1530',
+    noteTextColor: '#e0e6f0',
+    activationBorderColor: '#6ef6f7',
+    activationBkgColor: '#0a2a2b',
+    sequenceNumberColor: '#030508',
+    sectionBkgColor: '#0a2a2b',
+    altSectionBkgColor: '#0d1117',
+    sectionBkgColor2: '#1a1530',
+    taskBorderColor: '#6ef6f7',
+    taskBkgColor: '#0a2a2b',
+    taskTextColor: '#e0e6f0',
+    activeTaskBorderColor: '#a996ff',
+    activeTaskBkgColor: '#1a1530',
+    gridColor: 'rgba(255,255,255,0.08)',
+    doneTaskBkgColor: '#0a2b1a',
+    doneTaskBorderColor: '#34d399',
+    critBorderColor: '#ff9db8',
+    critBkgColor: '#2b0a1a',
+    fontFamily: 'Space Grotesk, sans-serif',
+    fontSize: '14px',
+  },
+  flowchart: {
+    curve: 'basis',
+    padding: 20,
+    nodeSpacing: 50,
+    rankSpacing: 60,
+    htmlLabels: true,
+    useMaxWidth: true,
+  },
+  sequence: {
+    diagramMarginX: 20,
+    diagramMarginY: 20,
+    actorMargin: 80,
+    width: 180,
+    height: 50,
+    boxMargin: 10,
+    boxTextMargin: 8,
+    noteMargin: 10,
+    messageMargin: 40,
+    mirrorActors: true,
+    useMaxWidth: true,
+  },
+});
 
 const WidgetCard = ({ widget, onMinimize, onRemove, onFractalExpand }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -53,30 +128,72 @@ const WidgetCard = ({ widget, onMinimize, onRemove, onFractalExpand }) => {
     if (!contentRef.current) return;
 
     if (widget.type === 'diagram') {
-      // Mermaid render - clean up any markdown code blocks
       let cleanContent = widget.content || '';
-      if (cleanContent.includes('```mermaid')) {
-        cleanContent = cleanContent.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
-      } else if (cleanContent.includes('```')) {
-        cleanContent = cleanContent.replace(/```/g, '').trim();
+      
+      // Strip markdown code fences
+      cleanContent = cleanContent.replace(/```(?:mermaid)?\s*/gi, '').replace(/```/g, '').trim();
+      
+      // Find where actual Mermaid diagram starts (strip any preceding text)
+      const diagramTypes = ['graph ', 'graph\n', 'flowchart ', 'flowchart\n', 'sequenceDiagram', 'stateDiagram', 'classDiagram', 'erDiagram', 'pie', 'mindmap'];
+      let diagramStart = -1;
+      for (const dt of diagramTypes) {
+        const pos = cleanContent.indexOf(dt);
+        if (pos !== -1 && (diagramStart === -1 || pos < diagramStart)) {
+          diagramStart = pos;
+        }
+      }
+      if (diagramStart > 0) {
+        cleanContent = cleanContent.substring(diagramStart);
+      }
+      
+      // Remove any stray HTML/XML tags
+      cleanContent = cleanContent.replace(/<[^>]+>/g, '').trim();
+      
+      // Fix common Mermaid syntax issues
+      // Escape problematic characters in node labels
+      cleanContent = cleanContent.replace(/\(([^)]*\([^)]*\)[^)]*)\)/g, (m, inner) => `("${inner}")`);
+      
+      if (!cleanContent) {
+        if (contentRef.current) {
+          contentRef.current.innerHTML = '<div style="color: #8994ad; padding: 20px; text-align: center; font-family: DM Mono, monospace; font-size: 13px;">No diagram content available</div>';
+        }
+        return;
       }
       
       const uniqueId = `mermaid-${widget.id}-${Math.random().toString(36).substr(2, 9)}`;
       
-      mermaid.render(uniqueId, cleanContent)
-        .then((result) => {
+      const tryRender = async (content, attempt = 1) => {
+        try {
+          const result = await mermaid.render(uniqueId + (attempt > 1 ? `-r${attempt}` : ''), content);
           if (contentRef.current) {
             contentRef.current.innerHTML = result.svg;
+            // Apply custom styling to SVG
+            const svg = contentRef.current.querySelector('svg');
+            if (svg) {
+              svg.style.maxWidth = '100%';
+              svg.style.height = 'auto';
+            }
           }
-        })
-        .catch(err => {
+        } catch (err) {
+          if (attempt === 1) {
+            // Retry with simplified content: remove style directives that might cause issues
+            let simplified = content.replace(/style\s+\w+[^\n]*/g, '').replace(/linkStyle[^\n]*/g, '').replace(/classDef[^\n]*/g, '').trim();
+            if (simplified !== content) {
+              return tryRender(simplified, 2);
+            }
+          }
+          // Final fallback: show styled code block
           if (contentRef.current) {
-            contentRef.current.innerHTML = `<div style="color: #ff3366; text-align: left; overflow: auto; padding: 10px;">
-              <strong>Mermaid Error:</strong> ${err.message}
-              <pre style="margin-top: 10px; opacity: 0.7;">${cleanContent}</pre>
-            </div>`;
+            contentRef.current.innerHTML = `
+              <div style="padding: 16px; font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.6; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(110,246,247,0.15); overflow: auto;">
+                <div style="color: #ff9db8; margin-bottom: 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">⚠ Diagram Rendering Issue</div>
+                <pre style="color: #8994ad; white-space: pre-wrap; margin: 0;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+              </div>`;
           }
-        });
+        }
+      };
+      
+      tryRender(cleanContent);
     }
   }, [widget]);
 

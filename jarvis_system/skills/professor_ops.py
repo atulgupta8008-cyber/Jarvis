@@ -10,6 +10,37 @@ from skills.deep_research import deep_research_protocol
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
 
+def clean_mermaid_content(raw: str) -> str:
+    """Cleans raw diagram_board content to ensure valid Mermaid.js syntax."""
+    if not raw:
+        return raw
+    
+    # Strip markdown code fences
+    cleaned = re.sub(r'^```(?:mermaid)?\s*', '', raw.strip())
+    cleaned = re.sub(r'\s*```$', '', cleaned).strip()
+    
+    # Find where the actual Mermaid diagram starts
+    diagram_types = [
+        'graph ', 'graph\n', 'flowchart ', 'flowchart\n',
+        'sequenceDiagram', 'stateDiagram', 'classDiagram',
+        'erDiagram', 'gantt', 'pie', 'mindmap'
+    ]
+    
+    best_pos = -1
+    for dt in diagram_types:
+        pos = cleaned.find(dt)
+        if pos != -1 and (best_pos == -1 or pos < best_pos):
+            best_pos = pos
+    
+    if best_pos > 0:
+        # There's text before the diagram keyword — strip it
+        cleaned = cleaned[best_pos:]
+    
+    # Ensure no stray HTML or XML tags remain
+    cleaned = re.sub(r'<[^>]+>', '', cleaned).strip()
+    
+    return cleaned if cleaned else raw
+
 SOCRATIC_PROFESSOR_PROMPT = """
 You are a distinguished MIT Professor of Physics, Mathematics, and Advanced Engineering.
 Your teaching method is built on First-Principles Socratic Pedagogy.
@@ -23,7 +54,7 @@ CORE SOCRATIC PEDAGOGY PROTOCOL:
 3. BLACKBOARD SCAFFOLDING (<math_board>):
    When mathematical derivations or formal expressions are involved, render the key structural equations on the blackboard using clean, multi-line LaTeX (\\begin{aligned} ... \\end{aligned}). Explain the physical meaning of every variable and operator.
 4. VISUAL & GEOMETRICAL GROUNDING (<diagram_board>, <simulation_board>):
-   Use system flowcharts, vector diagrams, or interactive dynamic simulations to anchor algebraic formulas in physical space.
+   Use strict Mermaid.js syntax (with styled, colorful nodes) on <diagram_board>, or interactive dynamic simulations on <simulation_board> to anchor algebraic formulas in physical space. NEVER include outside text in <diagram_board>.
 5. FORWARD CATALYST QUESTION:
    After delivering the complete answer, conclude with exactly ONE sharp, thought-provoking question or challenging edge case that sparks curiosity and encourages the student to reason one step further into the deep mechanics.
 """
@@ -57,7 +88,7 @@ CORE SIMULATION-FIRST PEDAGOGY PROTOCOL:
 2. INTERACTIVE SIMULATION ENGINE (<simulation_board type="plotly">):
    Generate rich, interactive 2D/3D visualizations, vector fields, trajectory plots, or phase-space phase portraits using valid Plotly JSON format. Include labeled axes, trajectory traces, and dynamic parameters.
 3. SYSTEM ARCHITECTURES & TOPOLOGY (<diagram_board>):
-   Use Mermaid.js flowcharts, state transitions, or block diagrams on <diagram_board> to map causal relationships, feedback loops, and energy transfer pathways.
+   Use valid, colorful Mermaid.js flowcharts, state transitions, or block diagrams on <diagram_board> to map causal relationships, feedback loops, and energy transfer pathways. Do NOT place text outside of Mermaid syntax.
 4. GOVERNING EQUATIONS ON BLACKBOARD (<math_board>):
    Render the governing differential equations and constitutive relations on <math_board>, explicitly highlighting how each mathematical term directly maps to the visual behaviors observed in the simulation canvas.
 5. EXPERIMENTAL PARAMETER SWEEPS:
@@ -104,7 +135,7 @@ You are training a polymath. The user has just learned or is discussing a specif
 
 RULE 1 (The Alien Domain): Identify the user's current concept. Instantly select a completely unrelated, radically different field of study (e.g., if they are studying Physics, choose Biology, Economics, Psychology, or Computer Science).
 
-RULE 2 (The Challenge): Present the new domain. Challenge the user to write a generalized mathematical equation or draw a system diagram (using <math_board> or <diagram_board>) that accurately describes BOTH phenomena.
+RULE 2 (The Challenge): Present the new domain. Challenge the user to write a generalized mathematical equation or draw a system diagram (using <math_board> or <diagram_board> with strictly valid, styled Mermaid.js syntax and no extra text) that accurately describes BOTH phenomena.
 
 RULE 3 (No Spoilers): DO NOT give them the bridging equation. Give them a hint about the variable relationships (e.g., 'In fluids, we look at viscosity. What is the equivalent of viscosity in human crowd movement?').
 
@@ -244,8 +275,11 @@ async def handle_professor_query(
         "- Match your response depth to the complexity of the question. Simple question = concise answer. Deep question = comprehensive answer with boards.\n\n" \
         "FORMATTING RULES (when you DO use boards):\n" \
         "1. <math_board>...</math_board>: Pure, valid LaTeX only. Use \\\\begin{aligned} ... \\\\end{aligned} for multi-line derivations. Wrap step titles in \\\\text{Step 1: ...}. NEVER put plain English outside \\\\text{} inside <math_board>.\n" \
-        "2. <diagram_board>...</diagram_board>: Valid Mermaid.js syntax only.\n" \
-        "3. <simulation_board>...</simulation_board>: Detailed Plotly specification that will produce a RICH, FULL-CANVAS visualization. Describe the physics to simulate with enough detail that the resulting plot is meaningful, properly scaled, and visually impressive."
+        "2. <diagram_board>...</diagram_board>: STRICTLY valid Mermaid.js syntax ONLY. ZERO natural language text allowed. MUST start with a diagram type keyword (e.g. graph TD, flowchart LR, sequenceDiagram, stateDiagram-v2, classDiagram, erDiagram). Use style directives for colors (e.g., style A fill:#0a2a2b,stroke:#6ef6f7,stroke-width:2px,color:#6ef6f7; linkStyle default stroke:#6ef6f7,stroke-width:2px). Quote ALL node labels with special chars: A[\"Label (info)\"]. NO markdown code fences.\n" \
+        "3. <simulation_board>...</simulation_board>: Must contain a CLEAR NATURAL LANGUAGE DESCRIPTION of what to simulate. NOT raw code or JSON. Describe the physical phenomenon, variables, ranges, and plot type. Example: 'Plot the trajectory of a projectile with v0=50m/s at angles 30, 45, 60. Show x vs y. Include air resistance with drag coefficient 0.47.'\n" \
+        "NEGATIVE EXAMPLES (WHAT NOT TO DO):\n" \
+        "- DO NOT write 'Here is the diagram:' inside <diagram_board>.\n" \
+        "- DO NOT put JSON in <simulation_board>."
 
     if media_filenames:
         system_guardrails += f"\n\n[SESSION MEDIA VAULT: The student has uploaded the following course materials/PDFs for this session: {', '.join(media_filenames)}. Use these specific documents to guide your pedagogical explanations, problems, and derivations whenever relevant.]"
@@ -320,10 +354,42 @@ async def handle_professor_query(
                         config=genai.types.GenerateContentConfig(max_output_tokens=8192)
                     )
                     full_text = ""
+                    stream_buffer = ""
+                    board_tag_open = False
+                    
                     for chunk in response:
-                        full_text += chunk.text
+                        chunk_text = chunk.text
+                        full_text += chunk_text
+                        stream_buffer += chunk_text
+                        
+                        if re.search(r'<(?:math_board|diagram_board|simulation_board|plotly_data)', stream_buffer):
+                            board_tag_open = True
+                        
+                        if board_tag_open:
+                            if re.search(r'</(?:math_board|diagram_board|simulation_board|plotly_data)>', stream_buffer):
+                                clean = re.sub(r'<(?:math_board|diagram_board|simulation_board|plotly_data)[^>]*>.*?</(?:math_board|diagram_board|simulation_board|plotly_data)>', '', stream_buffer, flags=re.DOTALL)
+                                if clean.strip():
+                                    asyncio.run_coroutine_threadsafe(
+                                        send_ui_update({"status": "stream_chunk", "chunk": clean}),
+                                        loop
+                                    )
+                                stream_buffer = ""
+                                board_tag_open = False
+                        else:
+                            partial_tag = re.search(r'<(?:m|d|s|p)\w*$', stream_buffer)
+                            if partial_tag:
+                                pass
+                            else:
+                                if stream_buffer.strip():
+                                    asyncio.run_coroutine_threadsafe(
+                                        send_ui_update({"status": "stream_chunk", "chunk": stream_buffer}),
+                                        loop
+                                    )
+                                stream_buffer = ""
+                                
+                    if stream_buffer and not board_tag_open:
                         asyncio.run_coroutine_threadsafe(
-                            send_ui_update({"status": "stream_chunk", "chunk": chunk.text}),
+                            send_ui_update({"status": "stream_chunk", "chunk": stream_buffer}),
                             loop
                         )
                     return full_text
@@ -355,25 +421,41 @@ async def handle_professor_query(
             except Exception:
                 pass
 
-        # 5. Extract board blocks
-        math_board = None
-        math_match = re.search(r"<math_board[^>]*>(.*?)</math_board>", response_text, re.IGNORECASE | re.DOTALL)
-        if math_match:
-            math_board = math_match.group(1).strip()
-            response_text = re.sub(r"<math_board[^>]*>.*?</math_board>", "", response_text, flags=re.IGNORECASE | re.DOTALL).strip()
+        # 5. Extract board blocks (robust multi-match version)
+        def extract_boards(text, tag_pattern, strip_pattern):
+            boards = []
+            for match in re.finditer(tag_pattern, text, re.IGNORECASE | re.DOTALL):
+                content = match.group(1).strip()
+                content = re.sub(r'^```\w*\n?', '', content)
+                content = re.sub(r'\n?```$', '', content).strip()
+                if content:
+                    boards.append(content)
+            cleaned = re.sub(strip_pattern, '', text, flags=re.IGNORECASE | re.DOTALL).strip()
+            return boards, cleaned
 
-        diagram_board = None
-        diagram_match = re.search(r"<diagram_board[^>]*>(.*?)</diagram_board>", response_text, re.IGNORECASE | re.DOTALL)
-        if diagram_match:
-            diagram_board = diagram_match.group(1).strip()
-            response_text = re.sub(r"<diagram_board[^>]*>.*?</diagram_board>", "", response_text, flags=re.IGNORECASE | re.DOTALL).strip()
+        math_boards, response_text = extract_boards(
+            response_text,
+            r'<math_board[^>]*>(.*?)</math_board>',
+            r'<math_board[^>]*>.*?</math_board>'
+        )
+        math_board = math_boards[0] if math_boards else None
 
-        simulation_board = None
-        # Support both old <plotly_data> and new <simulation_board> for backward compatibility
-        sim_match = re.search(r"<(?:simulation_board|plotly_data)[^>]*>(.*?)</(?:simulation_board|plotly_data)>", response_text, re.IGNORECASE | re.DOTALL)
-        if sim_match:
-            simulation_board = sim_match.group(1).strip()
-            response_text = re.sub(r"<(?:simulation_board|plotly_data)[^>]*>.*?</(?:simulation_board|plotly_data)>", "", response_text, flags=re.IGNORECASE | re.DOTALL).strip()
+        diag_boards, response_text = extract_boards(
+            response_text,
+            r'<diagram_board[^>]*>(.*?)</diagram_board>',
+            r'<diagram_board[^>]*>.*?</diagram_board>'
+        )
+        if diag_boards:
+            diagram_board = clean_mermaid_content(diag_boards[0])
+        else:
+            diagram_board = None
+
+        sim_boards, response_text = extract_boards(
+            response_text,
+            r'<(?:simulation_board|plotly_data)[^>]*>(.*?)</(?:simulation_board|plotly_data)>',
+            r'<(?:simulation_board|plotly_data)[^>]*>.*?</(?:simulation_board|plotly_data)>'
+        )
+        simulation_board = sim_boards[0] if sim_boards else None
     # Re-extract boards if deep research returned them (avoid duplication)
     # Actually deep_research_protocol already does the extraction! We should skip extraction if deep_research is true,
     # or just let it pass through. Since we did it in the else branch? 

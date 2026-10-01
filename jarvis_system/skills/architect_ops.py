@@ -10,6 +10,36 @@ from skills.deep_research import deep_research_protocol
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
 
+def clean_mermaid_content(raw: str) -> str:
+    """Cleans raw diagram_board content to ensure valid Mermaid.js syntax."""
+    if not raw:
+        return raw
+    
+    # Strip markdown code fences
+    cleaned = re.sub(r'^```(?:mermaid)?\s*', '', raw.strip())
+    cleaned = re.sub(r'\s*```$', '', cleaned).strip()
+    
+    # Find where the actual Mermaid diagram starts
+    diagram_types = [
+        'graph ', 'graph\n', 'flowchart ', 'flowchart\n',
+        'sequenceDiagram', 'stateDiagram', 'classDiagram',
+        'erDiagram', 'gantt', 'pie', 'mindmap'
+    ]
+    
+    best_pos = -1
+    for dt in diagram_types:
+        pos = cleaned.find(dt)
+        if pos != -1 and (best_pos == -1 or pos < best_pos):
+            best_pos = pos
+    
+    if best_pos > 0:
+        cleaned = cleaned[best_pos:]
+    
+    # Ensure no stray HTML or XML tags remain
+    cleaned = re.sub(r'<[^>]+>', '', cleaned).strip()
+    
+    return cleaned if cleaned else raw
+
 async def handle_architect_query(
     session_id: str, 
     text: str, 
@@ -136,7 +166,7 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
         "- Match your response depth to the complexity of their explanation. Simple input = concise response. Deep teaching = comprehensive feedback with boards.\n\n"
         "FORMATTING (when you DO use boards):\n"
         "1. <math_board>: Pure LaTeX only. Use \\begin{aligned} ... \\end{aligned} for multi-line.\n"
-        "2. <diagram_board>: Valid Mermaid.js syntax only.\n"
+        "2. <diagram_board>: STRICTLY valid Mermaid.js syntax ONLY. ZERO natural language text allowed. Use style directives for colors.\n"
         "3. <simulation_board>: Detailed Plotly specification for a rich, full-canvas visualization."
     )
     messages.append({"role": "user", "parts": [guardrails_text + output_rules]})
@@ -236,7 +266,7 @@ Score HONESTLY based on the user's LATEST message only. A perfect score should b
     diagram_board = None
     diagram_match = re.search(r"<diagram_board[^>]*>(.*?)</diagram_board>", response_text, re.IGNORECASE | re.DOTALL)
     if diagram_match:
-        diagram_board = diagram_match.group(1).strip()
+        diagram_board = clean_mermaid_content(diagram_match.group(1).strip())
         response_text = re.sub(r"<diagram_board[^>]*>.*?</diagram_board>", "", response_text, flags=re.IGNORECASE | re.DOTALL).strip()
 
     simulation_board = None

@@ -10,6 +10,36 @@ from core.supabase_db import cloud_engine
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
 
+def clean_mermaid_content(raw: str) -> str:
+    """Cleans raw diagram_board content to ensure valid Mermaid.js syntax."""
+    if not raw:
+        return raw
+    
+    # Strip markdown code fences
+    cleaned = re.sub(r'^```(?:mermaid)?\s*', '', raw.strip())
+    cleaned = re.sub(r'\s*```$', '', cleaned).strip()
+    
+    # Find where the actual Mermaid diagram starts
+    diagram_types = [
+        'graph ', 'graph\n', 'flowchart ', 'flowchart\n',
+        'sequenceDiagram', 'stateDiagram', 'classDiagram',
+        'erDiagram', 'gantt', 'pie', 'mindmap'
+    ]
+    
+    best_pos = -1
+    for dt in diagram_types:
+        pos = cleaned.find(dt)
+        if pos != -1 and (best_pos == -1 or pos < best_pos):
+            best_pos = pos
+    
+    if best_pos > 0:
+        cleaned = cleaned[best_pos:]
+    
+    # Ensure no stray HTML or XML tags remain
+    cleaned = re.sub(r'<[^>]+>', '', cleaned).strip()
+    
+    return cleaned if cleaned else raw
+
 def is_conversational_query(text: str) -> bool:
     """Detects if user input is small talk, greeting, or simple conversational remark that doesn't need web research."""
     clean = re.sub(r"[^\w\s]", "", text.strip().lower())
@@ -290,7 +320,7 @@ Do not return any explanations, markdown text, or other wrappers outside the JSO
     diagram_board = None
     diagram_match = re.search(r"<diagram_board[^>]*>(.*?)</diagram_board>", response_text, re.IGNORECASE | re.DOTALL)
     if diagram_match:
-        diagram_board = diagram_match.group(1).strip()
+        diagram_board = clean_mermaid_content(diagram_match.group(1).strip())
         response_text = re.sub(r"<diagram_board[^>]*>.*?</diagram_board>", "", response_text, flags=re.IGNORECASE | re.DOTALL).strip()
         
     simulation_board = None
