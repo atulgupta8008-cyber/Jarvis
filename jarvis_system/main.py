@@ -467,7 +467,7 @@ async def jarvis_processing_loop():
                                 "user_id": user_id
                             })
                         else:
-                            await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": f"[System: Simulation failed - {result_url}]", "session_id": session_id, "user_id": user_id})
+                            print(f"[Professor Physics Engine Warning]: Simulation generation returned: {result_url}")
                             
                 # Refresh sessions list so auto-titling updates the sidebar immediately (ALL branches)
                 mode_for_refresh = "architect" if command.get("is_architect_mode") else ("sandbox" if is_sandbox_mode else ("study_group" if is_study_group else "professor"))
