@@ -330,7 +330,7 @@ export default function ProfessorMode({ onExit, initialQuestion, curiosityQuesti
           <button className="workspace-icon-button" onClick={() => setIsSessionsOpen(true)} title="Open Sessions Sidebar">
             <Menu size={20} />
           </button>
-          <div className="workspace-brand">JARVIS <span style={{ opacity: 0.5, fontWeight: 400 }}>// PROFESSOR</span></div>
+          <div className="workspace-brand">SCIGNITION <span style={{ opacity: 0.5, fontWeight: 400 }}>// PROFESSOR</span></div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

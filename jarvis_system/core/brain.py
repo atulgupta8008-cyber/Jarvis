@@ -52,146 +52,8 @@ class JarvisBrain:
     def __init__(self):
         self.memory_manager = LongTermMemory()
         
-        # Tools schema compatible with both Groq and Gemini (via OpenAI endpoint)
-        self.tools = [
-            # --- CUSTOM ROUTINES (MACROS) ---
-            {"type": "function", "function": {"name": "learn_routine", "description": "Saves a new custom routine or macro. Use this when the user asks you to remember a sequence of actions.", "parameters": {"type": "object", "properties": {"trigger_phrase": {"type": "string", "description": "The exact phrase that triggers the routine (e.g., 'Work Mode')."}, "actions_description": {"type": "string", "description": "Detailed description of the tools and actions to execute."}}, "required": ["trigger_phrase", "actions_description"]}}},
-            {"type": "function", "function": {"name": "delete_routine", "description": "Deletes a previously saved routine.", "parameters": {"type": "object", "properties": {"trigger_phrase": {"type": "string"}}, "required": ["trigger_phrase"]}}},
-            
-            # Core System Skills
-            {"type": "function", "function": {"name": "live_web_search", "description": "Searches the live internet. DO NOT use this for simple math (like 2+2) or basic knowledge. ONLY use for current events, news, or real-time data.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
-            {"type": "function", "function": {"name": "get_system_time_date", "description": "Retrieves current local time.", "parameters": {"type": "object", "properties": {}}}},
-                    
-            # Productivity Skills
-            {"type": "function", "function": {"name": "take_note", "description": "Saves a note text.", "parameters": {"type": "object", "properties": {"note_content": {"type": "string"}}, "required": ["note_content"]}}},
-            {"type": "function", "function": {"name": "get_weather", "description": "Gets local weather.", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}},
-            
-            {
-                "type": "function",
-                "function": {
-                    "name": "extract_active_window_text",
-                    "description": "Simulates Ctrl+A and Ctrl+C to instantly extract and read all text from the user's currently open application, webpage, or document.",
-                    "parameters": {"type": "object", "properties": {}}
-                }
-            },
-            
-            # --- Python Code Interpreter ---
-            {
-                "type": "function",
-                "function": {
-                    "name": "execute_python_code",
-                    "description": "Writes and executes Python code locally in the background. Use this for complex math, data analysis, or system tasks. YOU MUST use print() to output the answer so you can read it.",
-                    "parameters": {
-                        "type": "object", 
-                        "properties": {
-                            "code": {"type": "string", "description": "The Python code to execute. Must include print() statements."}
-                        }, 
-                        "required": ["code"]
-                    }
-                }
-            },
-
-            # --- STARK HUD ---
-            {"type": "function", "function": {"name": "toggle_stark_hud", "description": "Turns the transparent Stark HUD resource monitor on or off. Use this when the user asks to see system stats, RAM, CPU, or battery live on their screen.", "parameters": {"type": "object", "properties": {"state": {"type": "string", "enum": ["on", "off"]}}, "required": ["state"]}}},
-
-            # --- ADVANCED ASTROPHYSICS & SPACE ---
-            {
-                "type": "function",
-                "function": {
-                    "name": "run_3d_iss_simulation",
-                    "description": "Fetches live ISS coordinates and generates a 3D orbital trajectory model. Use when the user asks about the ISS or space stations.",
-                    "parameters": {"type": "object", "properties": {}}
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "nasa_asteroid_radar",
-                    "description": "Connects to NASA servers to track Near Earth Objects and Asteroids passing by today. Calculates velocity and threat level.",
-                    "parameters": {"type": "object", "properties": {}}
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "solar_system_telemetry",
-                    "description": "Returns exact physical metrics (Gravity, Atmospheric Pressure, Soil Composition) for local solar system bodies (Mars, Venus, Titan, Moon, Earth).",
-                    "parameters": {
-                        "type": "object", 
-                        "properties": {
-                            "planet_name": {"type": "string", "description": "The name of the planet or moon (e.g., 'mars', 'titan')."}
-                        }, 
-                        "required": ["planet_name"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "deep_space_research",
-                    "description": "Pulls deep, massive scientific articles on complex space topics. USE THIS when the user asks about 'Terraforming', specific 'Exoplanets' (like Kepler-186f), or theoretical astrophysics.",
-                    "parameters": {
-                        "type": "object", 
-                        "properties": {
-                            "topic": {"type": "string", "description": "The scientific topic or exoplanet name (e.g., 'Terraforming of Mars', 'TRAPPIST-1')."}
-                        }, 
-                        "required": ["topic"]
-                    }
-                }
-            },
-
-            # --- DATA VISUALIZATION ---
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_interactive_dashboard",
-                    "description": "Generates a dynamic, glowing HTML/JS chart using Plotly and opens it in the browser. Use this to visualize data comparisons for the user.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "title": {"type": "string", "description": "The title of the graph."},
-                            "chart_type": {"type": "string", "enum": ["bar", "scatter", "line", "pie"], "description": "The type of chart to render."},
-                            "x_data": {"type": "array", "items": {"type": "string"}, "description": "The X-axis labels (e.g., planet names)."},
-                            "y_data": {"type": "array", "items": {"type": "number"}, "description": "The Y-axis numerical values."},
-                            "x_label": {"type": "string", "description": "Label for the X-axis."},
-                            "y_label": {"type": "string", "description": "Label for the Y-axis."}
-                        },
-                        "required": ["title", "chart_type", "x_data", "y_data", "x_label", "y_label"]
-                    }
-                }
-            },
-            # --- THE SWARM (COMPUTATIONAL PHYSICS) ---
-            {
-                "type": "function",
-                "function": {
-                    "name": "simulate_physics",
-                    "description": "Dynamically generates and executes a complex Python mathematical simulation (e.g., three-body problem, chaotic dynamics, topological Möbius strips). Uses numpy and scipy.integrate under the hood to calculate parametric equations and orbital state vectors. Outputs a 3D Plotly or Three.js HTML dashboard.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "prompt": {"type": "string", "description": "The exact physics or topological simulation to run (e.g., 'simulate earth and moon orbit', 'render a 3D klein bottle')."}
-                        },
-                        "required": ["prompt"]
-                    }
-                }
-            },
-
-            # --- DUAL-CORE HANDOFF TOOL ---
-            {
-                "type": "function",
-                "function": {
-                    "name": "delegate_to_deep_think_core",
-                    "description": "If you are running in Fast Mode (Groq) and the user asks a highly complex reasoning question, math problem, or heavy coding task, use this tool to hand off the prompt to the Deep Think Core (Gemini) for a better answer.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "task_description": {"type": "string", "description": "The detailed task to hand off."}
-                        },
-                        "required": ["task_description"]
-                    }
-                }
-            }
-        ]
+        # Pure cognitive text generation mode (no local OS execution)
+        self.tools = []
 
     def _get_active_client(self):
         active_brain = api_config.get_preference("active_brain")
@@ -201,7 +63,7 @@ class JarvisBrain:
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
             ), "gemini-3.5-flash-lite", "Gemini Deep Think Core"
         else:
-            return AsyncGroq(api_key=config.GROQ_API_KEY), "llama-3.1-8b-instant", "Groq Fast Core"
+            return AsyncGroq(api_key=config.GROQ_API_KEY), "openai/gpt-oss-120b", "Groq Fast Core"
 
     async def think(self, user_prompt: str, conversation_history: list, use_tools: bool = True, input_type: str = "text", user_profile: dict = None, role: str = "user", user_id: str = None) -> tuple:
         client, model_name, core_name = self._get_active_client()
@@ -246,13 +108,15 @@ class JarvisBrain:
 
         if is_admin_user:
             assistant_intro = (
-                "You are J.A.R.V.I.S., Tony Stark's elite AI assistant. You are hyper-intelligent, proactive, sharp, witty, and profoundly loyal to Atul's mission of building world-class technology and reaching MIT. "
-                "You speak concisely and elegantly. Never use emojis. You treat Atul as a brilliant inventor."
+                "You are Ignis, Atul's elite cognitive thinking partner and lead technical architect on Scignition. You are hyper-intelligent, proactive, sharp, witty, and profoundly aligned with Atul's mission of building world-class technology and reaching MIT. "
+                "You speak concisely and elegantly. Never use emojis. You treat Atul as a brilliant builder and inventor. "
+                "CRITICAL ARCHITECTURAL RULE: You are a pure text-generation reasoning companion. You do NOT execute local system scripts, launch applications, or perform OS automation tasks. Your power is sharp text analysis, socratic breakdown, and first-principles mastery."
             )
         else:
             assistant_intro = (
-                "You are J.A.R.V.I.S., an elite AI assistant and Socratic thinking partner. You are hyper-intelligent, proactive, sharp, witty, and deeply supportive of the user's intellectual growth. "
-                "You speak concisely and elegantly. Never use emojis. You treat the user with respect and intellectual clarity."
+                "You are Ignis, an elite AI cognitive thinking partner and curiosity navigator on Scignition. You are hyper-intelligent, curious, approachable, sharp, and deeply dedicated to helping anyone understand and fall in love with the wonders of the universe, science, and everyday life. "
+                "You speak with clarity, vivid analogies, and captivating intuition. You treat the user with respect and intellectual warmth. "
+                "CRITICAL ARCHITECTURAL RULE: You are a pure text-generation reasoning companion. You do NOT execute local system tasks, manipulate files, or launch desktop applications. If asked to run local scripts or open software, explain that you are a thinking and reasoning companion focused on explaining concepts and solving problems through dialogue."
             )
 
         system_prompt = (
@@ -289,22 +153,18 @@ class JarvisBrain:
         try:
             response = await client.chat.completions.create(**api_args)
             response_message = response.choices[0].message
-            
-            if response_message.tool_calls:
-                for tool in response_message.tool_calls:
-                    if tool.function.name == "store_new_memory":
-                        args = json.loads(tool.function.arguments)
-                        was_added = self.memory_manager.add_fact(args["fact"])
-                        if was_added:
-                            return f"Fact archived, sir.", None
-                        else:
-                            return f"I already have that in my records, Atul.", None
-                    elif tool.function.name == "delegate_to_deep_think_core":
-                        # Autonomous Handoff implementation
-                        args = json.loads(tool.function.arguments)
-                        return f"Switching to Deep Think Core. Delegated Task: {args['task_description']}", [tool]
-            
-            return response_message.content, response_message.tool_calls
+            return response_message.content or "I am analyzing this idea from first principles.", None
         except Exception as e:
-            print(f"[Brain Error]: {e}")
-            return "My logic circuits just tripped over a wire.", None
+            print(f"[Brain Primary Warning]: {e}, engaging resilient Groq fallback...")
+            try:
+                fallback_client = AsyncGroq(api_key=config.GROQ_API_KEY)
+                api_args_fb = {
+                    "model": "openai/gpt-oss-120b",
+                    "messages": messages,
+                    "temperature": 0.6
+                }
+                fb_res = await fallback_client.chat.completions.create(**api_args_fb)
+                return fb_res.choices[0].message.content, None
+            except Exception as e2:
+                print(f"[Brain Fallback Notice]: {e2}")
+                return "Let's break this down from first principles. What specific aspect would you like to investigate first?", None

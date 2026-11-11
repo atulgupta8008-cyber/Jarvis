@@ -221,7 +221,7 @@ export default function SocraticChatPanel({
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={theme === 'architect' ? "Explain system..." : "Ask Professor Jarvis..."}
+          placeholder={theme === 'architect' ? "Explain system..." : "Ask Professor Ignis..."}
           style={{
             flex: 1, padding: '8px 6px', background: 'transparent', border: 'none',
             color: '#f4f7ff', fontFamily: 'Space Grotesk, sans-serif', outline: 'none', fontSize: '0.9rem',

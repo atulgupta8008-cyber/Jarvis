@@ -7,6 +7,10 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from google import genai
+try:
+    import groq
+except ImportError:
+    groq = None
 import config
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
@@ -111,12 +115,26 @@ BROKEN SCRIPT:
 """
     try:
         def _generate():
-            response = client.models.generate_content(
-                model="gemini-3.5-flash-lite",
-                contents=repair_prompt,
-                config=genai.types.GenerateContentConfig(temperature=0.1, max_output_tokens=4096)
-            )
-            return response.text
+            try:
+                response = client.models.generate_content(
+                    model="gemini-3.5-flash-lite",
+                    contents=repair_prompt,
+                    config=genai.types.GenerateContentConfig(temperature=0.1, max_output_tokens=4096)
+                )
+                return response.text
+            except Exception as gemini_err:
+                print(f"[Physics Ops] Gemini self-repair failed: {gemini_err}. Attempting Groq...")
+                groq_key = getattr(config, "GROQ_API_KEY", None) or os.getenv("GROQ_API_KEY")
+                if groq and groq_key:
+                    groq_client = groq.Client(api_key=groq_key)
+                    completion = groq_client.chat.completions.create(
+                        model=getattr(config, "LLM_MODEL", "openai/gpt-oss-120b"),
+                        messages=[{"role": "user", "content": repair_prompt}],
+                        temperature=0.1,
+                        max_tokens=4096
+                    )
+                    return completion.choices[0].message.content
+                raise gemini_err
         fixed = await asyncio.to_thread(_generate)
         return clean_code(fixed)
     except Exception as e:
@@ -383,12 +401,26 @@ AESTHETIC & THEME GUIDELINES:
     code = ""
     try:
         def _generate():
-            response = client.models.generate_content(
-                model="gemini-3.5-flash-lite",
-                contents=f"{system_prompt}\n\nUSER DIRECTIVE: {prompt}",
-                config=genai.types.GenerateContentConfig(temperature=0.15, max_output_tokens=4096)
-            )
-            return response.text
+            try:
+                response = client.models.generate_content(
+                    model="gemini-3.5-flash-lite",
+                    contents=f"{system_prompt}\n\nUSER DIRECTIVE: {prompt}",
+                    config=genai.types.GenerateContentConfig(temperature=0.15, max_output_tokens=4096)
+                )
+                return response.text
+            except Exception as gemini_err:
+                print(f"[Physics Ops] Gemini simulation generation failed: {gemini_err}. Attempting Groq...")
+                groq_key = getattr(config, "GROQ_API_KEY", None) or os.getenv("GROQ_API_KEY")
+                if groq and groq_key:
+                    groq_client = groq.Client(api_key=groq_key)
+                    completion = groq_client.chat.completions.create(
+                        model=getattr(config, "LLM_MODEL", "openai/gpt-oss-120b"),
+                        messages=[{"role": "user", "content": f"{system_prompt}\n\nUSER DIRECTIVE: {prompt}"}],
+                        temperature=0.15,
+                        max_tokens=4096
+                    )
+                    return completion.choices[0].message.content
+                raise gemini_err
 
         raw_response = await asyncio.to_thread(_generate)
         code = clean_code(raw_response)

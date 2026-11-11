@@ -3,22 +3,113 @@ import { motion, useInView, AnimatePresence, useScroll, useTransform, useSpring,
 import {
   ArrowDownRight, ArrowRight, Bot, BrainCircuit, Compass,
   Cpu, Mic, Orbit, Shield, ShieldCheck, Sparkles, Users, Menu, X,
-  Layers, Zap, BookOpen, FlaskConical, HelpCircle, Flame, MessageSquare
+  Layers, Zap, BookOpen, FlaskConical, HelpCircle, Flame, MessageSquare,
+  Trophy, RotateCcw, CheckCircle2, Award
 } from 'lucide-react';
 import OrbitalCore from './OrbitalCore';
 import './NexusLanding.css';
 
-const FALLBACK_CURIOSITY_HOOKS = [
-  { question: "A teaspoon of neutron star weighs 6 billion tons. But why doesn't it collapse into a black hole?", category: "Astrophysics", difficulty: 2, hook_type: "paradox" },
-  { question: "You learned F=ma in school. What if I told you Newton's version is technically wrong?", category: "Physics", difficulty: 2, hook_type: "mindblown" },
-  { question: "Can you design a bridge that uses ONLY tension — no compression allowed?", category: "Engineering", difficulty: 3, hook_type: "challenge" },
-  { question: "What if Earth suddenly had two Suns? Would we even survive the first week?", category: "Astrophysics", difficulty: 1, hook_type: "whatif" },
-  { question: "Why does hot water freeze faster than cold water? Even scientists can't fully agree.", category: "Thermodynamics", difficulty: 2, hook_type: "paradox" },
-  { question: "If you fell into a black hole, you'd see the entire future of the universe flash before your eyes. Why?", category: "Relativity", difficulty: 3, hook_type: "mindblown" },
-  { question: "Can you calculate how much energy is stored in a single raisin using E=mc²?", category: "Nuclear Physics", difficulty: 1, hook_type: "challenge" },
-  { question: "What if gravity suddenly became 10x stronger right now? How long would buildings last?", category: "Physics", difficulty: 2, hook_type: "whatif" },
-  { question: "Why can you never actually touch anything? Quantum mechanics says it's impossible.", category: "Quantum Physics", difficulty: 1, hook_type: "paradox" },
-  { question: "What happens if you travel at the speed of light and turn on a flashlight?", category: "Relativity", difficulty: 2, hook_type: "whatif" }
+const EVERYDAY_MYSTERIES = [
+  {
+    id: "mpemba",
+    question: "Why does boiling hot water freeze faster in the freezer than cold water?",
+    category: "Everyday Mysteries",
+    difficulty: 1,
+    hook_type: "paradox",
+    options: ["Hot water evaporates & convects faster", "Cold water has more dissolved gas"],
+    answer_idx: 0,
+    teaser: "It is called the Mpemba Effect! Rapid convection currents, micro-evaporation, and hydrogen bond stretching allow warm water to outpace cold water in certain cooling regimes."
+  },
+  {
+    id: "mirrors",
+    question: "Why do mirrors flip your reflection left-to-right, but NEVER upside-down?",
+    category: "Everyday Mysteries",
+    difficulty: 1,
+    hook_type: "mindblown",
+    options: ["Mirrors flip front-to-back, not sideways", "Gravity aligns our optic nerves"],
+    answer_idx: 0,
+    teaser: "Mirrors don't actually flip left and right at all—they invert front to back (Z-axis)! Your brain mentally rotates yourself 180 degrees to match it, creating the illusion."
+  },
+  {
+    id: "coffee",
+    question: "Why does coffee wake you up if it actually provides zero physical calories?",
+    category: "Everyday Mysteries",
+    difficulty: 1,
+    hook_type: "mindblown",
+    options: ["Caffeine blocks your brain's sleepiness receptors", "It speeds up red blood cell flow"],
+    answer_idx: 0,
+    teaser: "Caffeine is an impostor molecule! It slots directly into your brain's adenosine receptors, preventing fatigue chemicals from telling your body that it is tired."
+  },
+  {
+    id: "spicy",
+    question: "Why does chili feel burning hot even when you eat it ice-cold from the fridge?",
+    category: "Everyday Mysteries",
+    difficulty: 1,
+    hook_type: "paradox",
+    options: ["Capsaicin tricks your physical heat receptors", "Chilis generate chemical heat"],
+    answer_idx: 0,
+    teaser: "Capsaicin chemically binds to the TRPV1 receptor on your tongue—the exact same biological sensor that warns your brain when you are touching a 43°C+ flame!"
+  },
+  {
+    id: "birds",
+    question: "Why don't birds get electrocuted when perched on bare 10,000-volt power lines?",
+    category: "Nature Superpowers",
+    difficulty: 1,
+    hook_type: "mindblown",
+    options: ["Both feet share the exact same electrical potential", "Bird feet have thick rubber-like skin"],
+    answer_idx: 0,
+    teaser: "Electricity requires a voltage drop between two points to flow. Since both feet touch the exact same wire, zero current travels through the bird's body!"
+  },
+  {
+    id: "cats",
+    question: "Why can cats survive high-rise falls from 30 floors up better than from 7 floors?",
+    category: "Nature Superpowers",
+    difficulty: 2,
+    hook_type: "paradox",
+    options: ["They reach terminal velocity and relax like skydivers", "Wind currents lift them up"],
+    answer_idx: 0,
+    teaser: "After ~7 stories, a cat hits terminal velocity (~60 mph), their vestibular system stabilizes, and they spread out like a parachute to distribute the shock safely!"
+  },
+  {
+    id: "headphones",
+    question: "How do noise-canceling headphones erase loud jet engines by playing MORE sound?",
+    category: "Pocket Magic",
+    difficulty: 2,
+    hook_type: "mindblown",
+    options: ["Destructive interference cancels sound waves to zero", "Acoustic foam blocks air completely"],
+    answer_idx: 0,
+    teaser: "Microphones listen to incoming engine sound waves and instantly synthesize an inverted 'anti-wave'. The wave crests meet troughs, mathematically canceling sound to zero!"
+  },
+  {
+    id: "airplane",
+    question: "Why does every passenger airplane window have a tiny mystery hole at the bottom?",
+    category: "Pocket Magic",
+    difficulty: 1,
+    hook_type: "mindblown",
+    options: ["It balances air pressure between outer and inner panes", "It supplies emergency air cabin flow"],
+    answer_idx: 0,
+    teaser: "Called a 'bleed hole', it regulates the pressure difference between the pressurized cabin and the freezing -50°C thin air at 35,000 feet, keeping the outer pane safe!"
+  },
+  {
+    id: "touch",
+    question: "Why can you never actually 'touch' anything in the universe, including your phone?",
+    category: "Mind & Body",
+    difficulty: 2,
+    hook_type: "paradox",
+    options: ["Negative electrons repel each other before contact", "Air molecules create an unbreakable cushion"],
+    answer_idx: 0,
+    teaser: "Electron shells in your fingertip atoms and the screen's atoms repel each other via the electromagnetic force. You never touch matter; you only ever feel electrostatic repulsion!"
+  },
+  {
+    id: "paper",
+    question: "Why would folding an ordinary piece of printer paper 42 times reach the Moon?",
+    category: "Cosmic What-Ifs",
+    difficulty: 1,
+    hook_type: "mindblown",
+    options: ["Exponential doubling (2^42) creates cosmic thickness", "Paper fibers stretch infinitely in vacuum"],
+    answer_idx: 0,
+    teaser: "Exponential math! Doubling 0.1 mm paper 42 times equals 2^42 × 0.1mm ≈ 439,800 kilometers—surpassing the Moon's 384,400 km orbit easily!"
+  }
 ];
 
 function Reveal({ children, className = '', delay = 0, direction = 'up', scale, rotate, blur }) {
@@ -179,9 +270,9 @@ function StaggerWords({ text, className = '' }) {
 }
 
 const modes = [
-  { num: '01', title: 'Professor', tag: 'Socratic learning', desc: 'A Socratic AI tutor that guides you through physics, math, and engineering — asking the right questions so you truly understand, not just memorize.', icon: BrainCircuit, mode: 'professor', color: 'cyan' },
-  { num: '02', title: 'Architect', tag: 'Systems thinking', desc: 'Map the moving parts of any problem. Teach an AI student your topic and get scored on clarity — the fastest way to find gaps in your understanding.', icon: Compass, mode: 'architect', color: 'violet' },
-  { num: '03', title: 'Jarvis', tag: 'Voice AI workspace', desc: 'Your personal AI assistant with voice commands, real-time telemetry, and a command-line interface — the central intelligence hub.', icon: Bot, mode: 'assistant', color: 'emerald' },
+  { num: '01', title: 'Professor', tag: 'Socratic learning', desc: 'A Socratic AI mentor that breaks down physics, math, and everyday mechanics — asking the right questions so you truly understand the world.', icon: BrainCircuit, mode: 'professor', color: 'cyan' },
+  { num: '02', title: 'Architect', tag: 'Systems thinking', desc: 'Map the moving parts of any problem. Teach an AI student your topic and get scored on clarity — the fastest way to find gaps in your thinking.', icon: Compass, mode: 'architect', color: 'violet' },
+  { num: '03', title: 'Ignis', tag: 'Cognitive Companion', desc: 'Your personal AI thinking companion for rich dialogues, thought experiments, and everyday insights — pure text reasoning, zero fluff.', icon: Bot, mode: 'assistant', color: 'emerald' },
   { num: '04', title: 'Study Group', tag: 'Collaborative debate', desc: 'Two AI agents — a skeptic and an advocate — debate your ideas from opposing sides, sharpening your thinking through structured discussion.', icon: Users, mode: 'study-group', color: 'rose' },
 ];
 
@@ -189,15 +280,15 @@ const capabilities = [
   { title: 'Fractal Derivations', detail: 'Click any variable in an equation to expand it infinitely — each layer goes deeper into fundamental physics.', icon: Layers },
   { title: 'Deep Research Protocol', detail: 'Multi-agent swarm research synthesizes information from multiple angles before delivering a comprehensive answer.', icon: Zap },
   { title: 'Time Machine Mode', detail: 'Travel to the moment of discovery. Experience science as it was first found — derive the laws yourself from raw data.', icon: BookOpen },
-  { title: 'Live Simulations', detail: 'Interactive Plotly simulations render directly on the blackboard. Visualize physics concepts in real-time.', icon: FlaskConical },
+  { title: 'Live 3D Simulations', detail: 'Interactive Plotly simulations render directly on the blackboard. Rotate and visualize physics concepts in 3D.', icon: FlaskConical },
   { title: 'Voice Commands', detail: 'Speak naturally to set context, ask questions, and navigate between modes — powered by an offline wake word engine.', icon: Mic },
 ];
 
 const stats = [
   { value: '4', label: 'THINKING MODES' },
   { value: '∞', label: 'DERIVATION DEPTH' },
-  { value: 'LIVE', label: 'SIMULATIONS' },
-  { value: 'VOICE', label: 'NATIVE COMMANDS' },
+  { value: 'LIVE', label: '3D SIMULATIONS' },
+  { value: 'ZERO', label: 'JARGON BARRIERS' },
 ];
 
 export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaunchCuriosity, onOpenCuriosityDashboard, onOpenFeedback, onOpenProfile, user, profile, isAdmin }) {
@@ -208,6 +299,22 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
   
   const [mobileMenu, setMobileMenu] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Gamification state: XP and level
+  const [wonderXP, setWonderXP] = useState(() => {
+    try {
+      const saved = localStorage.getItem('scignition_wonder_xp');
+      return saved ? parseInt(saved, 10) : 50;
+    } catch {
+      return 50;
+    }
+  });
+
+  // Interactive Quiz Spotlight State
+  const [activeMysteryIndex, setActiveMysteryIndex] = useState(0);
+  const [quizAnswered, setQuizAnswered] = useState(false);
+  const [userChoiceIdx, setUserChoiceIdx] = useState(null);
+  const [cardSeed, setCardSeed] = useState(0);
 
   const { scrollYProgress } = useScroll({ container: containerRef });
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
@@ -231,13 +338,42 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
 
   const ctaInView = useInView(ctaRef, { once: true, margin: '-20% 0px' });
 
-  const allHooks = (curiosityHooks && curiosityHooks.length > 0) ? curiosityHooks : FALLBACK_CURIOSITY_HOOKS;
+  // Use everyday mysteries pool as source of truth for high engagement
+  const pool = (curiosityHooks && curiosityHooks.length >= 4) ? curiosityHooks : EVERYDAY_MYSTERIES;
 
-  const categories = ['All', 'Astrophysics', 'Physics', 'Relativity', 'Quantum Physics', 'Engineering', 'Thermodynamics'];
+  const categories = ['All', 'Everyday Mysteries', 'Nature Superpowers', 'Pocket Magic', 'Mind & Body', 'Cosmic What-Ifs'];
   
-  const filteredHooks = selectedCategory === 'All' 
-    ? allHooks 
-    : allHooks.filter(h => h.category?.toLowerCase() === selectedCategory.toLowerCase());
+  const filteredPool = selectedCategory === 'All' 
+    ? pool 
+    : pool.filter(h => h.category?.toLowerCase() === selectedCategory.toLowerCase());
+
+  // Show only 3 clean, uncluttered cards
+  const displayHooks = filteredPool.slice(cardSeed, cardSeed + 3).length === 3 
+    ? filteredPool.slice(cardSeed, cardSeed + 3)
+    : filteredPool.slice(0, 3);
+
+  const currentMystery = EVERYDAY_MYSTERIES[activeMysteryIndex % EVERYDAY_MYSTERIES.length];
+
+  const handleMysteryChoice = (idx) => {
+    if (quizAnswered) return;
+    setUserChoiceIdx(idx);
+    setQuizAnswered(true);
+    const newXP = wonderXP + 50;
+    setWonderXP(newXP);
+    try {
+      localStorage.setItem('scignition_wonder_xp', String(newXP));
+    } catch {}
+  };
+
+  const handleNextMystery = () => {
+    setQuizAnswered(false);
+    setUserChoiceIdx(null);
+    setActiveMysteryIndex(prev => (prev + 1) % EVERYDAY_MYSTERIES.length);
+  };
+
+  const handleShuffleCards = () => {
+    setCardSeed(prev => (prev + 3) % (filteredPool.length > 3 ? filteredPool.length : 1));
+  };
 
   const jump = (id) => { 
     setMobileMenu(false); 
@@ -259,6 +395,9 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
     }
   };
 
+  // Curiosity Level calculation based on XP
+  const curiosityLevel = Math.max(1, Math.floor(wonderXP / 100) + 1);
+
   return (
     <div className="nexus-landing" ref={containerRef}>
       <div className="nexus-noise" />
@@ -268,16 +407,22 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
       <nav className="nexus-nav">
         <div className="nav-logo" onClick={() => jump('top')} style={{ cursor: 'pointer' }}>
           <span className="logo-hex"><Sparkles size={14} /></span>
-          NOVANETS<span style={{ color: 'var(--cyan)' }}>//</span>OS
+          SCIGNITION<span style={{ color: 'var(--cyan)' }}>//</span>OS
         </div>
         <div className="nav-links">
           <button className="nav-link" onClick={() => jump('mission')}>Mission</button>
           <button className="nav-link" onClick={() => jump('modes')}>Modes</button>
-          <button className="nav-link" onClick={() => jump('curiosity')}>Curiosity Feed</button>
+          <button className="nav-link" onClick={() => jump('curiosity')}>Ignition Studio</button>
           <button className="nav-link" onClick={() => jump('core')}>Core</button>
           <button className="nav-link" onClick={onOpenFeedback} style={{ color: 'var(--cyan, #6ef6f7)' }}>Feedback</button>
         </div>
         <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Gamified Wonder XP Badge in Nav */}
+          <div className="nav-xp-badge" title="Your Curiosity XP">
+            <Trophy size={12} color="#ffd165" />
+            <span>{wonderXP} XP</span>
+          </div>
+
           <button 
             type="button"
             onClick={onOpenProfile}
@@ -328,7 +473,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
               <span>Admin Console</span>
             </button>
           )}
-          <button className="btn-launch" onClick={() => go('professor')}>Open Jarvis <ArrowRight size={14} /></button>
+          <button className="btn-launch" onClick={() => go('professor')}>Launch Ignis <ArrowRight size={14} /></button>
           <button className="mobile-menu-toggle" onClick={() => setMobileMenu(true)} aria-label="Menu"><Menu size={22} /></button>
         </div>
       </nav>
@@ -346,7 +491,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + i * 0.06 }}
                 onClick={() => jump(label.toLowerCase().replace(' ', '-'))}
-              >{label}</motion.button>
+              >{label === 'Curiosity' ? 'Ignition Studio' : label}</motion.button>
             ))}
             <motion.button className="mob-link"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -387,7 +532,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.36 }}
               onClick={() => go('professor')}
-            >Open Jarvis <ArrowRight size={14} /></motion.button>
+            >Launch Ignis <ArrowRight size={14} /></motion.button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -399,27 +544,32 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
             <motion.div className="hero-kicker"
               initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-            >Personal intelligence, made actionable</motion.div>
+            >
+              <Flame size={13} style={{ color: 'var(--amber)' }} />
+              <span>THE CURIOSITY IGNITION STUDIO</span>
+            </motion.div>
 
             <h1 className="hero-h1">
-              <StaggerWords text="THINK" />
-              <span className="accent-cyan"><StaggerWords text="DEEPER." /></span>
+              <StaggerWords text="IGNITE" />
+              <span className="accent-cyan"><StaggerWords text="WONDER." /></span>
               <br />
-              <StaggerWords text="BUILD" />
-              <i className="accent-serif"><StaggerWords text="further." /></i>
+              <StaggerWords text="UNRAVEL" />
+              <i className="accent-serif"><StaggerWords text="reality." /></i>
             </h1>
 
             <motion.p className="hero-desc"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.5 }}
-            >Jarvis is a personal AI workspace for deeper understanding. Ask better questions, run live simulations, derive equations from scratch, and leave every session smarter than you started.</motion.p>
+            >
+              Scignition turns everyday life mysteries into exhilarating revelations. Discover why mirrors flip front-to-back, why hot water freezes faster, and how reality actually works through interactive 3D simulations and Socratic conversations.
+            </motion.p>
 
             <motion.div className="hero-actions"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.65 }}
             >
-              <button className="btn-launch" onClick={() => go('professor')}>Start a conversation <ArrowRight size={14} /></button>
-              <button className="btn-secondary" onClick={() => jump('curiosity')}>Explore Curiosity Feed <ArrowDownRight size={14} /></button>
+              <button className="btn-launch" onClick={() => go('professor')}>Explore with Ignis <ArrowRight size={14} /></button>
+              <button className="btn-secondary" onClick={() => jump('curiosity')}>Test Your Intuition <ArrowDownRight size={14} /></button>
             </motion.div>
 
             <motion.div className="signal-bar"
@@ -427,26 +577,37 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
               transition={{ duration: 0.5, delay: 0.8 }}
             >
               <span className="signal-dot" />
-              System online · Voice, reasoning & creation in one interface
+              Cognitive Engine Ready · Interactive 3D Simulations Online
             </motion.div>
 
-            {/* Always visible discovery prompt chips */}
+            {/* Everyday Relatable Discovery Chips */}
             <motion.div 
               className="curiosity-chips"
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.9 }}
             >
-              {allHooks.slice(0, 3).map((h, i) => (
-                <button 
-                  key={i} 
-                  className="curiosity-chip" 
-                  onClick={() => onLaunchCuriosity?.(h.question)}
-                  title="Launch Socratic Investigation"
-                >
-                  <Sparkles size={12} /> {h.question}
-                </button>
-              ))}
+              <button 
+                className="curiosity-chip" 
+                onClick={() => onLaunchCuriosity?.("Why does boiling hot water freeze faster in the freezer than cold water?")}
+                title="Explore the Mpemba Effect"
+              >
+                <Sparkles size={12} /> Why does hot water freeze faster?
+              </button>
+              <button 
+                className="curiosity-chip" 
+                onClick={() => onLaunchCuriosity?.("Why don't birds get electrocuted when sitting on 10,000-volt power lines?")}
+                title="Explore Electrical Potential"
+              >
+                <Zap size={12} /> Why don't birds get shocked on wires?
+              </button>
+              <button 
+                className="curiosity-chip" 
+                onClick={() => onLaunchCuriosity?.("Why do mirrors flip left-to-right, but never upside-down?")}
+                title="Explore Mirror Symmetry"
+              >
+                <Flame size={12} /> Why do mirrors flip sideways, not up-down?
+              </button>
             </motion.div>
           </motion.div>
 
@@ -458,8 +619,8 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
             <div className="orbital-canvas">
               <OrbitalCore />
             </div>
-            <div className="orbital-label label-top">JARVIS//CORE <span>ACTIVE</span></div>
-            <div className="orbital-label label-bottom"><strong>COGNITION 01.00</strong><em>STABLE</em></div>
+            <div className="orbital-label label-top">IGNIS//CORE <span>ACTIVE</span></div>
+            <div className="orbital-label label-bottom"><strong>COGNITION 02.00</strong><em>STABLE</em></div>
           </motion.div>
 
           <div className="scroll-hint">SCROLL TO EXPLORE <span className="scroll-line" /></div>
@@ -481,13 +642,13 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
           <div className="manifesto-overlay" />
           <div className="manifesto-grid">
             <Reveal direction="left" blur>
-              <span className="section-tag">Why Jarvis</span>
+              <span className="section-tag">Why Scignition</span>
               <LineWipe />
               <h2 className="manifesto-h2">THE BEST WORK<br />STARTS WITH A<br /><span>BETTER QUESTION.</span></h2>
             </Reveal>
             <Reveal className="manifesto-copy" delay={0.12} direction="right" blur>
-              <p>Jarvis is not another tab that produces a wall of text. It is a responsive thinking environment — one place to clarify a goal, interrogate an idea, build a plan, and leave with real understanding.</p>
-              <p>Traditional search gives you results. Jarvis gives you comprehension. It challenges your assumptions, maps complex systems, and simulates the real world — ensuring you master the subject.</p>
+              <p>You don't need a PhD to be astonished by how the universe functions. Scignition was created to ignite the dormant spark of curiosity in every human mind—translating everyday oddities into unforgettable first-principles intuition.</p>
+              <p>Search engines give you sterile answers. Scignition gives you true comprehension. It invites you to test your intuition, watch physical phenomena come alive on 3D blackboards, and leave every session measurably smarter.</p>
               <button className="text-link" onClick={() => jump('modes')}>Explore all modes <ArrowRight size={14} /></button>
             </Reveal>
           </div>
@@ -507,47 +668,136 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
           </div>
         </section>
 
-        {/* === DEDICATED CURIOSITY SHOWCASE SECTION === */}
+        {/* === GAMIFIED CURIOSITY IGNITION STUDIO (Problem 1, 4, 5 Solution) === */}
         <section className="curiosity-section" id="curiosity">
           <div className="curiosity-container">
             <Reveal blur>
-              <span className="section-tag">◆ Daily Curiosity Engine</span>
-              <LineWipe />
-              <h2 className="curiosity-heading">
-                THE UNIVERSE IS FULL OF PARADOXES.<br />
-                <span>CHOOSE ONE TO UNRAVEL.</span>
-              </h2>
-              <p className="curiosity-subtext">
-                Every hook below is a portal into deep physics, engineering, and cosmology. Click any card to launch an instant Socratic investigation with Jarvis.
-              </p>
+              <div className="curiosity-header-row">
+                <div>
+                  <span className="section-tag">◆ Curiosity Ignition Studio</span>
+                  <LineWipe />
+                  <h2 className="curiosity-heading">
+                    DARE TO QUESTION REALITY.<br />
+                    <span>TEST YOUR INTUITION.</span>
+                  </h2>
+                  <p className="curiosity-subtext">
+                    Even simple things around you hide mind-blowing science. Pick your hunch below or spin a random mystery to discover how reality actually behaves.
+                  </p>
+                </div>
+
+                {/* Gamified Rank Card */}
+                <div className="gamified-rank-card">
+                  <div className="rank-top">
+                    <Trophy size={18} color="#ffd165" />
+                    <span className="rank-title">Curiosity Rank: Level {curiosityLevel} Explorer</span>
+                  </div>
+                  <div className="rank-progress-bar">
+                    <div className="rank-fill" style={{ width: `${Math.min(100, (wonderXP % 100) * 2)}%` }} />
+                  </div>
+                  <div className="rank-subtext">
+                    <span>{wonderXP} Wonder XP</span>
+                    <span>Next Level: {curiosityLevel * 100} XP</span>
+                  </div>
+                </div>
+              </div>
             </Reveal>
 
-            {/* Category Filter Tabs */}
+            {/* FEATURED INTERACTIVE MYSTERY ARENA */}
+            <div className="mystery-arena-box">
+              <div className="mystery-arena-header">
+                <div className="mystery-badge-row">
+                  <span className="mystery-pill-category">{currentMystery.category}</span>
+                  <span className="mystery-pill-badge" style={{ borderColor: getHookTypeColor(currentMystery.hook_type), color: getHookTypeColor(currentMystery.hook_type) }}>
+                    {currentMystery.hook_type.toUpperCase()}
+                  </span>
+                </div>
+                <button className="mystery-spin-btn" onClick={handleNextMystery} title="Spin another mystery">
+                  <RotateCcw size={14} />
+                  <span>Spin Mystery</span>
+                </button>
+              </div>
+
+              <h3 className="mystery-arena-question">
+                "{currentMystery.question}"
+              </h3>
+
+              {!quizAnswered ? (
+                <div className="mystery-options-grid">
+                  <div className="mystery-options-prompt">What does your intuition say?</div>
+                  <div className="mystery-options-buttons">
+                    {currentMystery.options?.map((opt, oIdx) => (
+                      <button 
+                        key={oIdx} 
+                        className="mystery-opt-btn"
+                        onClick={() => handleMysteryChoice(oIdx)}
+                      >
+                        <span className="opt-num">{oIdx === 0 ? 'A' : 'B'}</span>
+                        <span className="opt-text">{opt}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <motion.div 
+                  className="mystery-reveal-box"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <div className="reveal-badge">
+                    <Sparkles size={16} color="var(--cyan)" />
+                    <span>Mind Blow Revealed! (+50 XP Earned)</span>
+                  </div>
+                  <p className="reveal-teaser-text">{currentMystery.teaser}</p>
+                  <div className="reveal-actions">
+                    <button 
+                      className="btn-launch" 
+                      onClick={() => onLaunchCuriosity?.(currentMystery.question)}
+                    >
+                      <span>⚡ Unravel with Ignis (Full Socratic Breakdown)</span>
+                      <ArrowRight size={14} />
+                    </button>
+                    <button className="btn-secondary" onClick={handleNextMystery}>
+                      Next Mystery <RotateCcw size={13} style={{ marginLeft: 6 }} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Streamlined Category Filters */}
             <div className="curiosity-filter-bar">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   className={`curiosity-filter-btn ${selectedCategory === cat ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => { setSelectedCategory(cat); setCardSeed(0); }}
                 >
                   {cat}
                 </button>
               ))}
+              <button 
+                className="curiosity-filter-btn" 
+                onClick={handleShuffleCards}
+                style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--cyan)' }}
+              >
+                <RotateCcw size={12} /> Shuffle 3
+              </button>
             </div>
 
-            {/* Curiosity Cards Grid */}
+            {/* Clean 3-Card Discovery Grid (Clean look, NO 10-card clutter) */}
             <div className="curiosity-cards-grid">
-              {filteredHooks.map((hook, idx) => {
+              {displayHooks.map((hook, idx) => {
                 const typeColor = getHookTypeColor(hook.hook_type);
                 return (
-                  <Reveal key={idx} delay={idx * 0.05} className="curiosity-card">
+                  <Reveal key={idx} delay={idx * 0.06} className="curiosity-card">
                     <div 
                       className="curiosity-card-inner" 
                       onClick={() => onLaunchCuriosity?.(hook.question)}
                     >
                       <div className="curiosity-card-top">
                         <span className="curiosity-type-badge" style={{ borderColor: typeColor, color: typeColor }}>
-                          {hook.hook_type?.toUpperCase() || 'INSIGHT'}
+                          {hook.hook_type?.toUpperCase() || 'MYSTERY'}
                         </span>
                         <div className="curiosity-difficulty">
                           {[1, 2, 3].map((lvl) => (
@@ -566,7 +816,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
                       </p>
 
                       <div className="curiosity-card-action">
-                        <span>Investigate with Jarvis</span>
+                        <span>Investigate with Ignis</span>
                         <ArrowRight size={14} />
                       </div>
                     </div>
@@ -584,7 +834,7 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                 >
                   <Sparkles size={16} color="var(--violet)" />
-                  Open Fullscreen Curiosity Matrix
+                  Explore Full Curiosity Vault
                 </button>
               </div>
             )}
@@ -595,20 +845,20 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
         <section className="core-section" id="core">
           <div className="core-grid">
             <Reveal className="core-intro" direction="left" blur>
-              <span className="section-tag">Jarvis intelligence layer</span>
+              <span className="section-tag">Scignition intelligence layer</span>
               <LineWipe />
-              <h2 className="core-heading">YOUR INTENT,<br /><span>AMPLIFIED.</span></h2>
-              <p className="core-desc">Behind the interface is a powerful set of capabilities designed to turn natural language into robust workflows, deep research, and real-time computation.</p>
+              <h2 className="core-heading">YOUR CURIOSITY,<br /><span>AMPLIFIED.</span></h2>
+              <p className="core-desc">Behind the interface is a powerful suite of cognitive tools engineered to turn simple curiosity into deep conceptual mastery and real-time computation.</p>
               <button className="btn-launch" onClick={() => go('architect')}>Plan with Architect <ArrowRight size={14} /></button>
 
               <div className="console-card">
                 <div className="console-bar">
-                  <span><Cpu size={12} /> JARVIS // SESSION PREVIEW</span>
+                  <span><Cpu size={12} /> IGNIS // SESSION PREVIEW</span>
                   <span className="console-live"><span className="signal-dot" style={{ width: 5, height: 5 }} /> READY</span>
                 </div>
                 <div className="console-body">
-                  <p className="console-user">Help me understand quantum entanglement using a classical analogy first.</p>
-                  <p className="console-ai"><b>JARVIS</b> — Imagine a pair of magical coins. No matter how far apart, when you flip one and get heads, the other instantly shows heads too. That's the intuition. Now let's break down why classical correlation can't fully explain this...</p>
+                  <p className="console-user">Why does coffee wake me up if it doesn't give real physical energy?</p>
+                  <p className="console-ai"><b>IGNIS</b> — Imagine your brain is full of parking spots for sleep signals (adenosine). When they park, you feel exhausted. Caffeine is a phantom sports car that parks in every spot without turning on the sleep signal. Your brain never knows it's tired...</p>
                   <div className="console-actions">
                     <button className="console-action" onClick={() => go('professor')}>Open Professor</button>
                     <button className="console-action" onClick={() => go('architect')}>Map the concept</button>
@@ -639,9 +889,9 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
           />
           <Reveal className="cta-inner" scale blur>
             <Orbit size={28} className={ctaInView ? "cta-orbit-float" : ""} style={{ color: 'var(--cyan)', marginBottom: 12 }} />
-            <p className="cta-tag">JARVIS IS READY</p>
-            <h2 className="cta-heading">BRING THE QUESTION.<br /><span>LEAVE WITH MOMENTUM.</span></h2>
-            <button className="btn-launch cta-btn" onClick={() => go('professor')}>Launch Jarvis <ArrowRight size={14} /></button>
+            <p className="cta-tag">SCIGNITION IS READY</p>
+            <h2 className="cta-heading">BRING ANY QUESTION.<br /><span>LEAVE WITH WONDER.</span></h2>
+            <button className="btn-launch cta-btn" onClick={() => go('professor')}>Launch Scignition <ArrowRight size={14} /></button>
           </Reveal>
         </section>
       </main>
@@ -651,9 +901,9 @@ export default function NexusLanding({ onLaunchMode, curiosityHooks = [], onLaun
         <div className="footer-left">
           <div className="nav-logo" style={{ opacity: 0.5, fontSize: 11 }}>
             <span className="logo-hex" style={{ width: 20, height: 20, filter: 'grayscale(0.5)' }}><Sparkles size={10} /></span>
-            NOVANETS//OS
+            SCIGNITION//OS
           </div>
-          <span>Personal intelligence for purposeful work.</span>
+          <span>Igniting the spark of wonder and discovery in every human mind.</span>
         </div>
         <div className="footer-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button

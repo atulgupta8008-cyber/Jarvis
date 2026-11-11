@@ -21,16 +21,16 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { WS_URL } from './config';
 
 const DEFAULT_CURIOSITY_HOOKS = [
-  { question: "A teaspoon of neutron star weighs 6 billion tons. But why doesn't it collapse into a black hole?", category: "Astrophysics", difficulty: 2, hook_type: "paradox" },
-  { question: "You learned F=ma in school. What if I told you Newton's version is technically wrong?", category: "Physics", difficulty: 2, hook_type: "mindblown" },
-  { question: "Can you design a bridge that uses ONLY tension — no compression allowed?", category: "Engineering", difficulty: 3, hook_type: "challenge" },
-  { question: "What if Earth suddenly had two Suns? Would we even survive the first week?", category: "Astrophysics", difficulty: 1, hook_type: "whatif" },
-  { question: "Why does hot water freeze faster than cold water? Even scientists can't fully agree.", category: "Thermodynamics", difficulty: 2, hook_type: "paradox" },
-  { question: "If you fell into a black hole, you'd see the entire future of the universe flash before your eyes. Why?", category: "Relativity", difficulty: 3, hook_type: "mindblown" },
-  { question: "Can you calculate how much energy is stored in a single raisin using E=mc²?", category: "Nuclear Physics", difficulty: 1, hook_type: "challenge" },
-  { question: "What if gravity suddenly became 10x stronger right now? How long would buildings last?", category: "Physics", difficulty: 2, hook_type: "whatif" },
-  { question: "Why can you never actually touch anything? Quantum mechanics says it's impossible.", category: "Quantum Physics", difficulty: 1, hook_type: "paradox" },
-  { question: "What happens if you travel at the speed of light and turn on a flashlight?", category: "Relativity", difficulty: 2, hook_type: "whatif" }
+  { question: "Why does boiling hot water freeze faster in the freezer than cold water? (Mpemba Mystery)", category: "Everyday Mysteries", difficulty: 1, hook_type: "paradox" },
+  { question: "Why do mirrors flip your reflection left-to-right, but NEVER upside-down?", category: "Everyday Mysteries", difficulty: 1, hook_type: "mindblown" },
+  { question: "Why does coffee wake you up if it actually provides zero physical calories of energy?", category: "Everyday Mysteries", difficulty: 1, hook_type: "mindblown" },
+  { question: "Why does spicy chili feel burning hot even when you eat it ice-cold from the fridge?", category: "Everyday Mysteries", difficulty: 1, hook_type: "paradox" },
+  { question: "Why can cats survive high-rise falls from 30 floors up better than from 7 floors?", category: "Nature Superpowers", difficulty: 2, hook_type: "paradox" },
+  { question: "Why don't birds get electrocuted when sitting on 10,000-volt high-voltage power lines?", category: "Nature Superpowers", difficulty: 1, hook_type: "mindblown" },
+  { question: "How do noise-canceling headphones silence jet engines by creating MORE sound?", category: "Pocket Magic", difficulty: 2, hook_type: "mindblown" },
+  { question: "Why does every passenger airplane window have a tiny mystery hole at the bottom?", category: "Pocket Magic", difficulty: 1, hook_type: "mindblown" },
+  { question: "Why would folding an ordinary piece of paper 42 times reach all the way to the Moon?", category: "Cosmic What-Ifs", difficulty: 1, hook_type: "mindblown" },
+  { question: "Why can you never actually 'touch' anything in the universe, including your own phone?", category: "Mind & Body", difficulty: 2, hook_type: "paradox" }
 ];
 
 // URL Router mapping helpers
@@ -84,15 +84,15 @@ const getPathFromMode = (mode, question) => {
 
 const getTitleFromMode = (mode) => {
   switch (mode) {
-    case 'professor': return 'Professor Mode — Socratic AI Tutor | Jarvis';
-    case 'architect': return 'Architect Mode — Systems Thinking | Jarvis';
+    case 'professor': return 'Professor Mode — Socratic AI Tutor | Scignition';
+    case 'architect': return 'Architect Mode — Systems Thinking | Scignition';
     case 'assistant':
-    case 'jarvis': return 'Jarvis AI — Voice & Intelligence Workspace';
-    case 'study-group': return 'Study Group — Collaborative AI Debate | Jarvis';
-    case 'sandbox': return 'Sandbox Workspace | Jarvis';
-    case 'curiosity': return 'Curiosity Feed | Jarvis';
-    case 'admin': return 'Admin Console | Jarvis';
-    default: return 'Jarvis AI — Personal Intelligence Platform';
+    case 'jarvis': return 'Ignis AI — Cognitive Thinking Companion | Scignition';
+    case 'study-group': return 'Study Group — Collaborative AI Debate | Scignition';
+    case 'sandbox': return 'Sandbox Workspace | Scignition';
+    case 'curiosity': return 'Curiosity Feed | Scignition';
+    case 'admin': return 'Admin Console | Scignition';
+    default: return 'Scignition — Ignite Your Curiosity';
   }
 };
 
@@ -101,7 +101,7 @@ function AppContent() {
   const [state, setState] = useState({
     status: 'sleeping',
     mainText: 'System Standby',
-    subText: 'Say "Jarvis" or type a directive below'
+    subText: 'Say "Ignis" or explore a mystery below'
   });
   const [chatHistory, setChatHistory] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
@@ -120,6 +120,7 @@ function AppContent() {
   const [mobileTab, setMobileTab] = useState('chat');
   const [pendingIntent, setPendingIntent] = useState(null); // { mode, question }
   const ws = useRef(null);
+  const curiosityRequestedRef = useRef(false);
 
   const applyRoute = (mode, question = null, pushState = true) => {
     setIsNexusHubActive(mode === 'nexus');
@@ -242,14 +243,17 @@ function AppContent() {
           if (!isSubscribed) return;
           const currentId = userRef.current?.id;
           const currentAdmin = isAdminRef.current;
-          socket.send(JSON.stringify({ 
-            type: 'curiosity_feed_request',
-            interested_subjects: profile?.interested_subjects,
-            language: profile?.language,
-            user_id: currentId,
-            role: currentAdmin ? 'admin' : 'user',
-            user_profile: profile
-          }));
+          if (!curiosityRequestedRef.current) {
+            curiosityRequestedRef.current = true;
+            socket.send(JSON.stringify({ 
+              type: 'curiosity_feed_request',
+              interested_subjects: profile?.interested_subjects,
+              language: profile?.language,
+              user_id: currentId,
+              role: currentAdmin ? 'admin' : 'user',
+              user_profile: profile
+            }));
+          }
           socket.send(JSON.stringify({ type: 'system_command', action: 'resume_voice_agent' }));
         };
 

@@ -45,7 +45,7 @@ function formatDateTime(iso) {
 
 function formatRoleLabel(role) {
   const labels = {
-    user: 'Student', jarvis: 'Professor Jarvis', young_jarvis: 'Young Jarvis',
+    user: 'Student', jarvis: 'Professor Ignis', young_jarvis: 'Young Ignis',
     vance: 'Dr. Vance', ada: 'Ada'
   };
   return labels[role] || role;
@@ -431,7 +431,7 @@ export default function AdminDashboard({ onExit }) {
           </div>
         </div>
         <div className="admin-header-right">
-          <span className="admin-header-tag">NOVANETS // ADMIN</span>
+          <span className="admin-header-tag">SCIGNITION // ADMIN</span>
         </div>
       </header>
 

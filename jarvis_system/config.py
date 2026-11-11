@@ -26,4 +26,4 @@ VOICE_MODEL = "en-US-GuyNeural"
 AUDIO_CACHE_FILE = "jarvis_response.mp3"
 
 # LLM configuration
-LLM_MODEL = "llama-3.1-8b-instant"
+LLM_MODEL = "openai/gpt-oss-120b"

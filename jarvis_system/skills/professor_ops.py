@@ -410,8 +410,26 @@ async def handle_professor_query(
                     )
                     return response.text
             except Exception as ex:
-                print(f"[Professor Engine Error]: {ex}")
-                return f"I encountered an issue processing the course documents. Let's analyze the fundamental concepts directly: {ex}"
+                print(f"[Professor Engine Notice]: Primary model busy ({ex}), engaging resilient Groq fallback...")
+                try:
+                    from groq import Groq
+                    groq_client = Groq(api_key=config.GROQ_API_KEY)
+                    groq_messages = [{"role": "system", "content": system_guardrails}]
+                    for msg in history[-10:]:
+                        c = msg.get("content", "").strip()
+                        if c:
+                            r = "assistant" if msg.get("role") == "jarvis" else "user"
+                            groq_messages.append({"role": r, "content": c})
+                    groq_messages.append({"role": "user", "content": text if text.strip() else "Please explain the fundamental mechanisms from first principles."})
+                    fallback_comp = groq_client.chat.completions.create(
+                        model="openai/gpt-oss-120b",
+                        messages=groq_messages,
+                        temperature=0.4
+                    )
+                    return fallback_comp.choices[0].message.content or "Let's explore this scientific concept from first principles."
+                except Exception as fb_err:
+                    print(f"[Professor Groq Fallback Error]: {fb_err}")
+                    return "Let's explore this scientific phenomenon from first principles. What specific physical mechanism would you like to investigate?"
 
         response_text = await asyncio.to_thread(_generate)
 

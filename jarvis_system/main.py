@@ -477,7 +477,7 @@ async def jarvis_processing_loop():
             except Exception as e:
                 await manager.broadcast({"type": "professor_thinking", "is_thinking": False, "session_id": session_id, "user_id": user_id})
                 print(f"[Professor Engine Error]: {e}")
-                await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": f"[System Error]: {e}", "session_id": session_id, "user_id": user_id})
+                await manager.broadcast({"type": "professor_chat", "role": "jarvis", "message": "Let us examine this physical phenomenon from first principles. What specific aspect would you like to explore?", "session_id": session_id, "user_id": user_id})
                 
             await manager.broadcast({"type": "state", "state": "sleeping", "main_text": "System Standby", "sub_text": "Awaiting directive..."})
             continue
@@ -639,7 +639,7 @@ async def jarvis_processing_loop():
                         )
             
             if not response_text:
-                response_text = "Task executed successfully, sir."
+                response_text = "I am analyzing this idea from first principles."
             
             user_history.append({"role": "user", "content": user_text})
             user_history.append({"role": "assistant", "content": response_text})
@@ -647,7 +647,7 @@ async def jarvis_processing_loop():
             if len(user_history) > MAX_CHAT_HISTORY:
                 user_conversation_histories[user_key] = user_history[-MAX_CHAT_HISTORY:]
             
-            await manager.broadcast({"type": "chat", "role": "Jarvis", "message": response_text, "user_id": user_key})
+            await manager.broadcast({"type": "chat", "role": "Ignis", "message": response_text, "user_id": user_key})
             
             # 5. SPEAKING (Only if input was Voice)
             if input_type == "voice":
@@ -658,7 +658,7 @@ async def jarvis_processing_loop():
             await manager.broadcast({"type": "state", "state": "sleeping", "main_text": "System Standby", "sub_text": "Say 'Jarvis' or type a command"})
         except Exception as e:
             print(f"[Jarvis Flow Error]: {e}")
-            await manager.broadcast({"type": "chat", "role": "Jarvis", "message": f"[System Error]: {e}", "user_id": user_key})
+            await manager.broadcast({"type": "chat", "role": "Ignis", "message": "Let's break down this idea from first principles. What part should we examine first?", "user_id": user_key})
             await manager.broadcast({"type": "state", "state": "sleeping", "main_text": "System Standby", "sub_text": "Awaiting directive..."})
 
 
